@@ -1,0 +1,23 @@
+{
+  "name": "100",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "babel": "babel src --watch --out-file build/main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@gitlab.com/sounddd/100soundgens.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://gitlab.com/sounddd/100soundgens/issues"
+  },
+  "homepage": "https://gitlab.com/sounddd/100soundgens#README",
+  "devDependencies": {
+    "babel-cli": "^6.23.0",
+    "babel-preset-env": "^1.1.8"
+  }
+}

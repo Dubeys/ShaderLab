@@ -1,0 +1,21 @@
+{
+  "name": "framework",
+  "description": "100 days of graphics generation based on music",
+  "main": "",
+  "authors": [
+    "Igor Derval"
+  ],
+  "license": "MIT",
+  "homepage": "",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "threejs": "*"
+  }
+}
