@@ -3,10 +3,10 @@ Library of custom shaders for THREE.js.
 **Shaders** are located in the **src/shaders/** folder.
 
 #### material shaders
--   **Toon** src/shaders/toon.shader.js 
+-   **Toon** src/shaders/shader.toon.js 
 
 #### skybox shaders
--   **Firewatch** src/shaders/sky.shader.js
+-   **Firewatch** src/shaders/shader.sky.js
 
 &nbsp;
 
