@@ -147,12 +147,20 @@ class Inputs {
         }.bind(this))
 
         this.mouse = new THREE.Vector2();
+        this.mouse.deltaX = 0;
+        this.mouse.deltaY = 0;
         this.click = false;
         this.clickActive = false;
         this.mousedown = false;
         window.addEventListener('mousemove',function(event){
+            const x = this.mouse.x;
+            const y = this.mouse.y;
+
             this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
             this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+
+            this.mouse.deltaX = x - this.mouse.x;
+            this.mouse.deltaY = y - this.mouse.y;
         }.bind(this))
 
 
@@ -164,6 +172,8 @@ class Inputs {
                 }else{
                     this.click = false;
                 }
+
+                event.preventDefault();
         }.bind(this))
         canvas.addEventListener('mouseup',function(event){
             this.click = false;

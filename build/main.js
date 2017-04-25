@@ -32,6 +32,8 @@ var App = function () {
         // this.renderer.shadowMapHeight = 4096;
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 10000);
+        this.cameraTarget = new THREE.Vector2(Math.PI / 2, -Math.PI / 2);
+        // this.controls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
         this.mirror = new THREE.CubeCamera(1, 50000, 1024);
 
         this.postProcess = false;
@@ -61,6 +63,7 @@ var App = function () {
             requestAnimationFrame(this.run.bind(this));
 
             this.level.update();
+            this.cameraControlsUpdate();
 
             this.render();
         }
@@ -70,6 +73,18 @@ var App = function () {
             this.renderer.clear();
             this.renderer.setScissorTest(false);
             this.renderer.render(this.level, this.camera);
+        }
+    }, {
+        key: 'cameraControlsUpdate',
+        value: function cameraControlsUpdate() {
+
+            if (this.inputs.clickActive) {
+                this.cameraTarget.y += this.inputs.mouse.deltaX * 5;
+                this.cameraTarget.x += -this.inputs.mouse.deltaY * 2;
+            }
+
+            var vector = new THREE.Vector3(Math.cos(this.cameraTarget.y) * Math.sin(this.cameraTarget.x), Math.cos(this.cameraTarget.x), Math.sin(this.cameraTarget.y) * Math.sin(this.cameraTarget.x)).multiplyScalar(2000);
+            this.camera.lookAt(vector);
         }
     }], [{
         key: 'setSize',
@@ -437,12 +452,20 @@ var Inputs = function () {
         }.bind(this));
 
         this.mouse = new THREE.Vector2();
+        this.mouse.deltaX = 0;
+        this.mouse.deltaY = 0;
         this.click = false;
         this.clickActive = false;
         this.mousedown = false;
         window.addEventListener('mousemove', function (event) {
+            var x = this.mouse.x;
+            var y = this.mouse.y;
+
             this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
             this.mouse.x = event.clientX / window.innerWidth * 2 - 1;
+
+            this.mouse.deltaX = x - this.mouse.x;
+            this.mouse.deltaY = y - this.mouse.y;
         }.bind(this));
 
         var canvas = document.querySelector('canvas');
@@ -453,6 +476,8 @@ var Inputs = function () {
             } else {
                 this.click = false;
             }
+
+            event.preventDefault();
         }.bind(this));
         canvas.addEventListener('mouseup', function (event) {
             this.click = false;
@@ -535,11 +560,11 @@ var Scene = function (_THREE$Scene) {
             this.material = this.shaders[this.torusShader];
         };
 
-        var skyBox = new THREE.BoxGeometry(2000, 2000, 2000);
+        var skyBox = new THREE.IcosahedronGeometry(2000, 1);
 
         var skyShader = {
             color: new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide }),
-            firewatch: new shaderSky()
+            firewatch: new shaderSky({ camera: _this.camera })
         };
 
         var exampleSkybox = new THREE.Mesh(skyBox, skyShader.color);
@@ -551,10 +576,11 @@ var Scene = function (_THREE$Scene) {
         exampleSkybox.update = function (clock) {
             this.material = this.shaders[this.skyShader];
             if (this.skyShader === 'firewatch') {
-                this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime() / 2);
-                this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime() / 2);
+                // this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
+                // this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
                 this.material.uniforms.uSunPos.value.y = -.1 + this.nightday;
                 this.material.uniforms.sunInt.value = 1 - this.nightday;
+                this.position.copy(this.material.camera.position);
 
                 var radial = (20 + this.nightday * 35) / 360;
                 var radialSky = (195 + (1 - this.nightday) * 35) / 360;
@@ -562,6 +588,7 @@ var Scene = function (_THREE$Scene) {
                 this.material.uniforms.uHorHardColor.value.setHSL(radial, .5 + (1 - this.nightday) * .4, .2 + this.nightday * .75);
                 this.material.uniforms.uHorColor.value.setHSL(radialSky, .5 + (1 - this.nightday) * .1, .15 + this.nightday * .5);
                 this.material.uniforms.uAtmColor.value.setHSL(radialSky, .5 + (1 - this.nightday) * .1, this.nightday * .5);
+                this.material.calculateLookAt();
             } else {
                 this.material.color.r = this.plainColor[0] / 255;
                 this.material.color.g = this.plainColor[1] / 255;
@@ -571,11 +598,11 @@ var Scene = function (_THREE$Scene) {
             }
         };
 
-        var ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshPhongMaterial({ color: 0xCCBB88 }));
+        var ground = new THREE.Mesh(new THREE.CircleGeometry(2000, 10), new THREE.MeshPhongMaterial({ color: 0xCCBB88, side: THREE.DoubleSide }));
 
         ground.rotation.x = -Math.PI * .5;
         ground.position.y = -20;
-        ground.position.z = -1300;
+        // ground.position.z = -1300;
 
         var light = new THREE.DirectionalLight(0xFFFFFF, 1);
         light.position.set(-10, 20, 15);
@@ -729,7 +756,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     CACHE.loadJSONList('build/imports.json');
 });
-"use strict";
+'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -757,7 +784,8 @@ var shaderSky = function (_THREE$ShaderMaterial) {
             _ref$horizonLine = _ref.horizonLine,
             horizonLine = _ref$horizonLine === undefined ? new THREE.Color(0xbff6ff) : _ref$horizonLine,
             _ref$sun = _ref.sun,
-            sun = _ref$sun === undefined ? true : _ref$sun;
+            sun = _ref$sun === undefined ? true : _ref$sun,
+            camera = _ref.camera;
 
         _classCallCheck(this, shaderSky);
 
@@ -766,6 +794,13 @@ var shaderSky = function (_THREE$ShaderMaterial) {
         _this.side = THREE.BackSide;
 
         _this.sunPos = sunPosition;
+
+        if (camera) {
+            _this.cameraLookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            _this.camera = camera;
+        } else {
+            console.error('no camera provided');
+        }
 
         var sunOn = sun ? 1 : 0;
 
@@ -776,27 +811,34 @@ var shaderSky = function (_THREE$ShaderMaterial) {
             uAtmColor: { value: atmosphere },
             uHorHardColor: { value: horizonLine },
             uSunPos: { value: sunPosition },
-            sunInt: { value: 0 }
+            sunInt: { value: 0 },
+            cameraLookAt: { value: _this.cameraLookAt }
         };
 
-        _this.vertexShader = "uniform float time;\n\n    \t\tvarying vec3 vNormal;\n            varying vec2 vUv;\n            varying vec3 vViewPosition;\n\n    \t\tvoid main() {\n\n                vUv = uv;\n        \t\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n        \t\tvec4 worldPosition = modelMatrix * vec4( position, 1.0 );\n        \t\tvec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );\n        \t\tvNormal = normalize( normalMatrix * normal );\n                vViewPosition = - mvPosition.xyz;\n        \t\t// vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);\n                // cNormal = normalize( projectionMatrix * vec4(normal));\n\n            }";
+        _this.vertexShader = 'uniform float time;\n\n    \t\tvarying vec3 vNormal;\n            varying vec2 vUv;\n            varying vec3 vViewPosition;\n\n    \t\tvoid main() {\n\n                vUv = uv;\n        \t\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n        \t\tvec4 worldPosition = modelMatrix * vec4( position, 1.0 );\n        \t\tvNormal = normalize( normalMatrix * normal );\n                vViewPosition = position;\n        \t\t// vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);\n                // cNormal = normalize( projectionMatrix * vec4(normal));\n\n            }';
 
-        _this.fragmentShader = "uniform float time;\n            uniform vec3 uColor;\n            uniform vec3 uAtmColor;\n            uniform vec3 uHorColor;\n            uniform vec3 uHorHardColor;\n            uniform vec3 uSunPos;\n            uniform float sunInt;\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {\n            \tfloat d = length(pos - uv) - rad;\n            \tfloat t = clamp(d, 0.0, 1.0);\n            \treturn vec4(color, 1.0 - t);\n            }\n\n    \t\tvoid main() {\n                vec3 nPos = normalize(-vViewPosition);\n                vec3 fPos = nPos;\n                nPos = 0.5 + (nPos * 0.5);\n                vec3 gradient = vec3(0.0);\n                vec4 gradient2 = vec4(0.0);\n                vec3 colorAddition = vec3(0.0);\n                vec3 sunPos = normalize(uSunPos);\n\n                if(nPos.y > 0.49){\n                    gradient = clamp(mix(uHorColor,uAtmColor,-2.0*0.5+nPos.y*2.0),0.0,1.0);\n                }else{\n                    gradient = clamp(mix(uHorColor,uAtmColor,2.0*0.5-nPos.y*2.0),0.0,0.1);\n                }\n\n                if(nPos.y > 0.49){\n                    gradient2 = clamp(mix(vec4(gradient,0.0),vec4(uHorHardColor,1.0),10.0*0.6-nPos.y*10.0),0.0,1.0);\n                }\n\n                float dist = distance(sunPos,fPos);\n\n                vec4 sun = vec4(0.0);\n                vec4 sunColor = vec4(0.0);\n                if(dist*30.0 < 1.0){\n                    sun = vec4(1.0);\n                    sunColor = vec4(uColor,1.);\n                }\n\n                float dist2 = distance(vec3(sunPos.x,0.0,sunPos.z),vec3(fPos.x*0.5+sunPos.x*0.5,fPos.y*10.0,fPos.z));\n                dist = 0.5 / exp(log(dist)/7.0);\n                dist2 = 0.2/ exp(log(dist2)/4.0);\n                dist += dist2;\n                dist = clamp(dist,0.0,1.0);\n\n                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a);\n                vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);\n\n                vec4 mix2 = mix(mix1,rGradient,rGradient.a*2.5 - 1.5);\n\n                if(sun.r > 0.){\n                    mix2 = mix(sun,sunColor,sunInt);\n                }\n\n\n    \t\t\tgl_FragColor = vec4( mix2.rgb ,1.0);\n\n    \t\t}";
+        _this.fragmentShader = 'uniform float time;\n            uniform vec3 uColor;\n            uniform vec3 uAtmColor;\n            uniform vec3 uHorColor;\n            uniform vec3 uHorHardColor;\n            uniform vec3 uSunPos;\n            uniform float sunInt;\n            uniform vec3 cameraLookAt;\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {\n            \tfloat d = length(pos - uv) - rad;\n            \tfloat t = clamp(d, 0.0, 1.0);\n            \treturn vec4(color, 1.0 - t);\n            }\n\n            vec3 mod289(vec3 x) {\n              return x - floor(x * (1.0 / 239.0)) * 239.0;\n            }\n\n            vec2 mod289(vec2 x) {\n              return x - floor(x * (1.0 / 289.0)) * 289.0;\n            }\n\n            vec3 permute(vec3 x) {\n              return mod289(((x*34.0)+1.0)*x);\n            }\n\n            float snoise(vec2 v) {\n\n              const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0\n                                  0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)\n                                 -0.577350269189626,  // -1.0 + 2.0 * C.x\n                                  0.024390243902439); // 1.0 / 41.0\n            // First corner\n              vec2 i  = floor(v + dot(v, C.yy) );\n              vec2 x0 = v -   i + dot(i, C.xx);\n\n              vec2 i1;\n              i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);\n              vec4 x12 = x0.xyxy + C.xxzz;\n              x12.xy -= i1;\n\n              i = mod289(i); // Avoid truncation effects in permutation\n              vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))\n            \t\t+ i.x + vec3(0.0, i1.x, 1.0 ));\n\n              vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);\n              m = m*m ;\n              m = m*m ;\n              vec3 x = 2.0 * fract(p * C.www) - 1.0;\n              vec3 h = abs(x) - 0.5;\n              vec3 ox = floor(x + 0.5);\n              vec3 a0 = x - ox;\n              m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );\n              vec3 g;\n              g.x  = a0.x  * x0.x  + h.x  * x0.y;\n              g.yz = a0.yz * x12.xz + h.yz * x12.yw;\n              return 150.0 * dot(m, g);\n            }\n\n            float star(vec2 p) {\n              return step(1.0, smoothstep(0.5, 1.1, snoise(p)));\n            }\n\n    \t\tvoid main() {\n                vec3 nPos = normalize( vViewPosition);\n                vec3 fPos = nPos;\n                nPos = 0.5 + (nPos * 0.5);\n                vec3 gradient = vec3(0.0);\n                vec4 gradient2 = vec4(0.0);\n                vec3 colorAddition = vec3(0.0);\n                vec3 sunPos = normalize(uSunPos);\n\n                float nightdayIntensity = 0.2 + clamp(sunPos.y*.8,0.,1.);\n\n                if(nPos.y > 0.49){\n                    gradient = clamp(mix(uHorColor,uAtmColor,-2.0*0.5+nPos.y*2.0),0.0,1.0);\n                }else{\n                    gradient = clamp(mix(uHorColor,uAtmColor,2.0*0.5-nPos.y*2.0),0.0,0.1);\n                }\n\n                if(nPos.y > 0.49){\n                    gradient2 = clamp(mix(vec4(gradient,0.0),vec4(uHorHardColor,1.0),10.0*0.6-nPos.y*10.0),0.0,1.0);\n                }\n\n                float s1 = star(vUv * 300.);\n                float s2 = star(vUv * 500.5 + vec2(-20.0, 10.0));\n                float s3 = star(vUv * 700.14 + vec2(-75.0, 25.0));\n                vec3 starsLayer = vec3(s1 * 1. + s2 * .6 + s3 * .3 );\n\n                gradient += starsLayer * clamp(1. - sunPos.y * 2.0, 0.0,1.0);\n\n                float dist = distance(sunPos,fPos);\n\n                vec4 sun = vec4(0.0);\n                vec4 sunColor = vec4(0.0);\n                if(dist*30.0 < 1.0){\n                    sun = vec4(1.0);\n                    sunColor = vec4(uColor,1.);\n                }\n\n                float distanceToCamera = (1.0 - clamp(distance(normalize(cameraLookAt),sunPos)*1.2,0.0,1.0)) * .3;\n\n                float dist2 = distance(vec3(sunPos.x,0.0,sunPos.z),vec3(fPos.x*0.5+sunPos.x*0.5,fPos.y*10.0,fPos.z));\n                dist = 0.5 * (1.0 + distanceToCamera) / exp(log(dist)/7.0);\n                dist2 = 0.2 / exp(log(dist2)/4.0);\n                dist += dist2;\n                dist = clamp(dist,0.0,1.0);\n\n                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a);\n\n                vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);\n\n                vec4 mix2 = mix(mix1,rGradient,rGradient.a*2.5 - 1.5);\n\n                if(sun.r > 0.){\n                    mix2 = mix(sun,sunColor,sunInt);\n                }\n\n    \t\t\tgl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);\n\n    \t\t}';
         return _this;
     }
 
     _createClass(shaderSky, [{
-        key: "horizonLine",
+        key: 'calculateLookAt',
+        value: function calculateLookAt() {
+            // console.log(this.camera.quaternion);
+            this.uniforms.cameraLookAt.value = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        }
+    }, {
+        key: 'horizonLine',
         get: function get() {
             return this.uniforms.uHorHardColor.value;
         }
     }, {
-        key: "horizon",
+        key: 'horizon',
         get: function get() {
             return this.uniforms.uHorColor.value;
         }
     }, {
-        key: "sun",
+        key: 'sun',
         get: function get() {
             return this.uniforms.sunInt.value;
         },
@@ -804,12 +846,12 @@ var shaderSky = function (_THREE$ShaderMaterial) {
             this.uniforms.sunInt.value = value;
         }
     }, {
-        key: "sunColor",
+        key: 'sunColor',
         get: function get() {
             return this.uniforms.uColor.value;
         }
     }, {
-        key: "atmosphere",
+        key: 'atmosphere',
         get: function get() {
             return this.uniforms.uAtmColor.value;
         }

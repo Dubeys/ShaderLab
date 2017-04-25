@@ -17,6 +17,8 @@ class App {
         // this.renderer.shadowMapHeight = 4096;
 
         this.camera = new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.01,10000);
+        this.cameraTarget = new THREE.Vector2(Math.PI/2,-Math.PI/2);
+        // this.controls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
         this.mirror = new THREE.CubeCamera(1,50000,1024);
 
         this.postProcess = false;
@@ -45,6 +47,7 @@ class App {
         requestAnimationFrame(this.run.bind(this));
 
         this.level.update();
+        this.cameraControlsUpdate();
 
         this.render();
     }
@@ -53,6 +56,21 @@ class App {
         this.renderer.clear();
         this.renderer.setScissorTest(false);
         this.renderer.render(this.level,this.camera);
+    }
+
+    cameraControlsUpdate(){
+
+        if(this.inputs.clickActive){
+            this.cameraTarget.y += this.inputs.mouse.deltaX*5;
+            this.cameraTarget.x += -this.inputs.mouse.deltaY*2;
+        }
+
+        const vector = new THREE.Vector3(
+            Math.cos(this.cameraTarget.y) * Math.sin(this.cameraTarget.x),
+            Math.cos(this.cameraTarget.x),
+            Math.sin(this.cameraTarget.y) * Math.sin(this.cameraTarget.x)
+        ).multiplyScalar(2000);
+        this.camera.lookAt(vector);
     }
 
     static setSize(e){

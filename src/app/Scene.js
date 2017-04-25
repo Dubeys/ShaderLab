@@ -29,11 +29,11 @@ class Scene extends THREE.Scene{
             this.material = this.shaders[this.torusShader];
         }
 
-        const skyBox = new THREE.BoxGeometry(2000,2000,2000);
+        const skyBox = new THREE.IcosahedronGeometry(2000,1);
 
         const skyShader = {
             color: new THREE.MeshBasicMaterial({color: 0x000000,side: THREE.BackSide}),
-            firewatch: new shaderSky()
+            firewatch: new shaderSky({camera: this.camera})
         };
 
         const exampleSkybox = new THREE.Mesh(skyBox,skyShader.color);
@@ -45,10 +45,11 @@ class Scene extends THREE.Scene{
         exampleSkybox.update = function(clock){
             this.material = this.shaders[this.skyShader];
             if(this.skyShader === 'firewatch'){
-                this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
-                this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
+                // this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
+                // this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
                 this.material.uniforms.uSunPos.value.y = -.1 + this.nightday ;
                 this.material.uniforms.sunInt.value = 1-this.nightday;
+                this.position.copy(this.material.camera.position);
 
                 const radial = ( 20 + this.nightday * 35 ) / 360;
                 const radialSky = ( 195 + (1-this.nightday) * 35 ) / 360;
@@ -56,6 +57,7 @@ class Scene extends THREE.Scene{
                 this.material.uniforms.uHorHardColor.value.setHSL(radial, .5 + (1-this.nightday)*.4, .2 + this.nightday * .75);
                 this.material.uniforms.uHorColor.value.setHSL(radialSky, .5 + (1-this.nightday)*.1, .15 + this.nightday * .5);
                 this.material.uniforms.uAtmColor.value.setHSL(radialSky, .5 + (1-this.nightday)*.1, this.nightday * .5);
+                this.material.calculateLookAt();
             }else{
                 this.material.color.r = this.plainColor[0] / 255;
                 this.material.color.g = this.plainColor[1] / 255;
@@ -66,13 +68,13 @@ class Scene extends THREE.Scene{
         }
 
         const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(3000,3000),
-            new THREE.MeshPhongMaterial({color: 0xCCBB88})
+            new THREE.CircleGeometry(2000,10),
+            new THREE.MeshPhongMaterial({color: 0xCCBB88,side: THREE.DoubleSide})
         )
 
         ground.rotation.x = -Math.PI * .5;
         ground.position.y = -20;
-        ground.position.z = -1300;
+        // ground.position.z = -1300;
 
         const light = new THREE.DirectionalLight(0xFFFFFF,1);
         light.position.set(-10,20,15);
