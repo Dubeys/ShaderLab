@@ -47,9 +47,9 @@ class Scene extends THREE.Scene{
             if(this.skyShader === 'firewatch'){
 
                 this.position.copy(this.material.camera.position);
-                this.material.setSunAngle(clock.getElapsedTime()*100);
+                this.material.setSunAngle(180);
                 this.material.update(clock);
-                this.material.setTimeOfDay(this.nightday, [20,55] , 0, [195,230], 0);
+                this.material.setTimeOfDay(this.nightday, [20,55] , 1, [195,230], 1);
             }else{
                 this.material.color.r = this.plainColor[0] / 255;
                 this.material.color.g = this.plainColor[1] / 255;
