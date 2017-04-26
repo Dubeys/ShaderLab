@@ -3,5 +3,11 @@
         "type" : "texture",
         "url" : "assets/textures/hm_mountain.png",
         "name" : "hm_mountain"
-     }
+    },
+
+    {
+        "type" : "texture",
+        "url" : "assets/textures/clouds.png",
+        "name" : "clouds"
+    }
 ]

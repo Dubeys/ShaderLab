@@ -31,6 +31,10 @@ class Scene extends THREE.Scene{
 
         const skyBox = new THREE.IcosahedronGeometry(2000,1);
 
+        this.lib.clouds.raw.wrapS = THREE.RepeatWrapping;
+        this.lib.clouds.raw.wrapT = THREE.RepeatWrapping;
+        console.log(this.lib.clouds.raw)
+
         const skyShader = {
             color: new THREE.MeshBasicMaterial({color: 0x000000,side: THREE.BackSide}),
             firewatch: new shaderSky({camera: this.camera})
