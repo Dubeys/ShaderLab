@@ -45,20 +45,11 @@ class Scene extends THREE.Scene{
         exampleSkybox.update = function(clock){
             this.material = this.shaders[this.skyShader];
             if(this.skyShader === 'firewatch'){
-                // this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
-                // this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
-                this.material.uniforms.time.value = clock.getElapsedTime();
-                this.material.uniforms.uSunPos.value.y = -.1 + this.nightday ;
-                this.material.uniforms.sunInt.value = 1-this.nightday;
-                this.position.copy(this.material.camera.position);
 
-                const radial = ( 20 + this.nightday * 35 ) / 360;
-                const radialSky = ( 195 + (1-this.nightday) * 35 ) / 360;
-                this.material.uniforms.uColor.value.setHSL(radial, .5 + (1-this.nightday)*.4, .5 + this.nightday * .4);
-                this.material.uniforms.uHorHardColor.value.setHSL(radial, .5 + (1-this.nightday)*.4, .2 + this.nightday * .75);
-                this.material.uniforms.uHorColor.value.setHSL(radialSky, .5 + (1-this.nightday)*.1, .15 + this.nightday * .5);
-                this.material.uniforms.uAtmColor.value.setHSL(radialSky, .5 + (1-this.nightday)*.1, this.nightday * .5);
-                this.material.calculateLookAt();
+                this.position.copy(this.material.camera.position);
+                this.material.setSunAngle(clock.getElapsedTime()*100);
+                this.material.update(clock);
+                this.material.setTimeOfDay(this.nightday, [20,55] , 0, [195,230], 0);
             }else{
                 this.material.color.r = this.plainColor[0] / 255;
                 this.material.color.g = this.plainColor[1] / 255;
@@ -83,11 +74,11 @@ class Scene extends THREE.Scene{
 
         light.update = function(){
             if(this.follow.material.uniforms){
-                this.position.copy(this.follow.material.uniforms.uSunPos.value)
-                this.intensity = this.follow.material.uniforms.uSunPos.value.y > 0 ? this.follow.material.uniforms.uSunPos.value.y * .5 + .5 : 0;
-                this.position.normalize();
-                this.position.multiplyScalar(2000);
-                this.color.copy(this.follow.material.uniforms.uColor.value);
+
+                const info = this.follow.material.getLightInfo();
+                this.position.copy(info.position);
+                this.intensity = info.intensity;
+                this.color.copy(info.color);
             }else{
                 this.position.set(-10,20,15);
                 this.intensity = 1;

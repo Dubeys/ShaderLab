@@ -177,9 +177,36 @@ class shaderSky extends THREE.ShaderMaterial{
     		}`
     }
 
-    calculateLookAt(){
-        // console.log(this.camera.quaternion);
+    update(clock){
+        if(clock){
+            this.uniforms.time.value = clock.getElapsedTime();
+        }
         this.uniforms.cameraLookAt.value = new THREE.Vector3(0,0,-1).applyQuaternion(this.camera.quaternion);
+    }
+
+    setTimeOfDay(time = 0, sunHue = [20,55] , sunSat = 1, atmHue = [195,230], atmSat = 1){ // 0 night - 1 noon | hue
+        this.uniforms.uSunPos.value.y = -.1 + time;
+        this.uniforms.sunInt.value = 1-time;
+        const radial = ( sunHue[0] + time * (sunHue[1] - sunHue[0]) ) / 360;
+        const radialSky = ( atmHue[0] + (1-time) * (atmHue[1] - atmHue[0]) ) / 360;
+        this.uniforms.uColor.value.setHSL(radial, (.5 + (1-time)*.4) * sunSat, .5 + time * .4);
+        this.uniforms.uHorHardColor.value.setHSL(radial, (.5 + (1-time)*.4) * sunSat, .2 + time * .75);
+        this.uniforms.uHorColor.value.setHSL(radialSky, (.5 + (1-time)*.1) * atmSat, .15 + time * .5);
+        this.uniforms.uAtmColor.value.setHSL(radialSky, (.5 + (1-time)*.1) * atmSat, time * .5);
+    }
+
+    setSunAngle(angle) {
+        this.uniforms.uSunPos.value.x = Math.sin(( angle / 180 ) * Math.PI);
+        this.uniforms.uSunPos.value.z = Math.cos((angle / 180 ) * Math.PI);
+    }
+
+    getLightInfo(){
+        const position = this.uniforms.uSunPos.value.clone();
+        const intensity = this.uniforms.uSunPos.value.y > 0 ? this.uniforms.uSunPos.value.y * .5 + .5 : 0;
+        position.normalize();
+        position.multiplyScalar(2000);
+        const color = this.uniforms.uColor.value.clone();
+        return {position: position, intensity: intensity,color: color};
     }
 
     getFogColor(){
@@ -189,6 +216,14 @@ class shaderSky extends THREE.ShaderMaterial{
         fog.lerp(this.uniforms.uHorColor.value,alpha * .5 * (1 + this.uniforms.uSunPos.value.y*.8));
         fog.multiplyScalar(1 + (1 - alpha)*1.3);
         return fog.clone();
+    }
+
+    get sunPosition(){
+        return this.uniforms.uSunPos.value;
+    }
+
+    set sunPosition(value){
+        this.uniforms.uSunPos.value = value;
     }
 
     get horizonLine(){

@@ -578,20 +578,11 @@ var Scene = function (_THREE$Scene) {
         exampleSkybox.update = function (clock) {
             this.material = this.shaders[this.skyShader];
             if (this.skyShader === 'firewatch') {
-                // this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
-                // this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
-                this.material.uniforms.time.value = clock.getElapsedTime();
-                this.material.uniforms.uSunPos.value.y = -.1 + this.nightday;
-                this.material.uniforms.sunInt.value = 1 - this.nightday;
-                this.position.copy(this.material.camera.position);
 
-                var radial = (20 + this.nightday * 35) / 360;
-                var radialSky = (195 + (1 - this.nightday) * 35) / 360;
-                this.material.uniforms.uColor.value.setHSL(radial, .5 + (1 - this.nightday) * .4, .5 + this.nightday * .4);
-                this.material.uniforms.uHorHardColor.value.setHSL(radial, .5 + (1 - this.nightday) * .4, .2 + this.nightday * .75);
-                this.material.uniforms.uHorColor.value.setHSL(radialSky, .5 + (1 - this.nightday) * .1, .15 + this.nightday * .5);
-                this.material.uniforms.uAtmColor.value.setHSL(radialSky, .5 + (1 - this.nightday) * .1, this.nightday * .5);
-                this.material.calculateLookAt();
+                this.position.copy(this.material.camera.position);
+                this.material.setSunAngle(clock.getElapsedTime() * 100);
+                this.material.update(clock);
+                this.material.setTimeOfDay(this.nightday, [20, 55], 0, [195, 230], 0);
             } else {
                 this.material.color.r = this.plainColor[0] / 255;
                 this.material.color.g = this.plainColor[1] / 255;
@@ -613,11 +604,11 @@ var Scene = function (_THREE$Scene) {
 
         light.update = function () {
             if (this.follow.material.uniforms) {
-                this.position.copy(this.follow.material.uniforms.uSunPos.value);
-                this.intensity = this.follow.material.uniforms.uSunPos.value.y > 0 ? this.follow.material.uniforms.uSunPos.value.y * .5 + .5 : 0;
-                this.position.normalize();
-                this.position.multiplyScalar(2000);
-                this.color.copy(this.follow.material.uniforms.uColor.value);
+
+                var info = this.follow.material.getLightInfo();
+                this.position.copy(info.position);
+                this.intensity = info.intensity;
+                this.color.copy(info.color);
             } else {
                 this.position.set(-10, 20, 15);
                 this.intensity = 1;
@@ -827,10 +818,46 @@ var shaderSky = function (_THREE$ShaderMaterial) {
     }
 
     _createClass(shaderSky, [{
-        key: 'calculateLookAt',
-        value: function calculateLookAt() {
-            // console.log(this.camera.quaternion);
+        key: 'update',
+        value: function update(clock) {
+            if (clock) {
+                this.uniforms.time.value = clock.getElapsedTime();
+            }
             this.uniforms.cameraLookAt.value = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        }
+    }, {
+        key: 'setTimeOfDay',
+        value: function setTimeOfDay() {
+            var time = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+            var sunHue = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [20, 55];
+            var sunSat = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+            var atmHue = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : [195, 230];
+            var atmSat = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 1;
+            // 0 night - 1 noon | hue
+            this.uniforms.uSunPos.value.y = -.1 + time;
+            this.uniforms.sunInt.value = 1 - time;
+            var radial = (sunHue[0] + time * (sunHue[1] - sunHue[0])) / 360;
+            var radialSky = (atmHue[0] + (1 - time) * (atmHue[1] - atmHue[0])) / 360;
+            this.uniforms.uColor.value.setHSL(radial, (.5 + (1 - time) * .4) * sunSat, .5 + time * .4);
+            this.uniforms.uHorHardColor.value.setHSL(radial, (.5 + (1 - time) * .4) * sunSat, .2 + time * .75);
+            this.uniforms.uHorColor.value.setHSL(radialSky, (.5 + (1 - time) * .1) * atmSat, .15 + time * .5);
+            this.uniforms.uAtmColor.value.setHSL(radialSky, (.5 + (1 - time) * .1) * atmSat, time * .5);
+        }
+    }, {
+        key: 'setSunAngle',
+        value: function setSunAngle(angle) {
+            this.uniforms.uSunPos.value.x = Math.sin(angle / 180 * Math.PI);
+            this.uniforms.uSunPos.value.z = Math.cos(angle / 180 * Math.PI);
+        }
+    }, {
+        key: 'getLightInfo',
+        value: function getLightInfo() {
+            var position = this.uniforms.uSunPos.value.clone();
+            var intensity = this.uniforms.uSunPos.value.y > 0 ? this.uniforms.uSunPos.value.y * .5 + .5 : 0;
+            position.normalize();
+            position.multiplyScalar(2000);
+            var color = this.uniforms.uColor.value.clone();
+            return { position: position, intensity: intensity, color: color };
         }
     }, {
         key: 'getFogColor',
@@ -841,6 +868,14 @@ var shaderSky = function (_THREE$ShaderMaterial) {
             fog.lerp(this.uniforms.uHorColor.value, alpha * .5 * (1 + this.uniforms.uSunPos.value.y * .8));
             fog.multiplyScalar(1 + (1 - alpha) * 1.3);
             return fog.clone();
+        }
+    }, {
+        key: 'sunPosition',
+        get: function get() {
+            return this.uniforms.uSunPos.value;
+        },
+        set: function set(value) {
+            this.uniforms.uSunPos.value = value;
         }
     }, {
         key: 'horizonLine',
