@@ -162,7 +162,7 @@ class shaderSky extends THREE.ShaderMaterial{
                 dist += dist2;
                 dist = clamp(dist,0.0,1.0);
 
-                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a);
+                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a * (1. - sunPos.y));
 
                 vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);
 
@@ -180,6 +180,15 @@ class shaderSky extends THREE.ShaderMaterial{
     calculateLookAt(){
         // console.log(this.camera.quaternion);
         this.uniforms.cameraLookAt.value = new THREE.Vector3(0,0,-1).applyQuaternion(this.camera.quaternion);
+    }
+
+    getFogColor(){
+        let fog = this.uniforms.uHorHardColor.value.clone();
+        let alpha = this.uniforms.cameraLookAt.value.distanceTo(this.uniforms.uSunPos.value) * 1.2;
+        alpha = alpha > 1 ? 1 : alpha < 0 ? 0 : alpha;
+        fog.lerp(this.uniforms.uHorColor.value,alpha * .5 * (1 + this.uniforms.uSunPos.value.y*.8));
+        fog.multiplyScalar(1 + (1 - alpha)*1.3);
+        return fog.clone();
     }
 
     get horizonLine(){

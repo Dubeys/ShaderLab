@@ -12,7 +12,7 @@ class Scene extends THREE.Scene{
 
         this.prop = {};
 
-        this.fog = new THREE.FogExp2(0xFFFFFF,0.002);
+        this.fog = new THREE.FogExp2(0xFFFFFF,0.001);
 
         const torusKnot = new THREE.TorusKnotGeometry(10,3.5,120,20);
 
@@ -47,6 +47,7 @@ class Scene extends THREE.Scene{
             if(this.skyShader === 'firewatch'){
                 // this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
                 // this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
+                this.material.uniforms.time.value = clock.getElapsedTime();
                 this.material.uniforms.uSunPos.value.y = -.1 + this.nightday ;
                 this.material.uniforms.sunInt.value = 1-this.nightday;
                 this.position.copy(this.material.camera.position);
@@ -68,12 +69,12 @@ class Scene extends THREE.Scene{
         }
 
         const ground = new THREE.Mesh(
-            new THREE.CircleGeometry(2000,10),
-            new THREE.MeshPhongMaterial({color: 0xCCBB88,side: THREE.DoubleSide})
+            new THREE.PlaneGeometry(4000,4000,20,20),
+            new THREE.MeshPhongMaterial({color: 0xCCBB88,side: THREE.DoubleSide,displacementMap: lib.hm_mountain.raw, displacementScale: 400,shading: THREE.FlatShading})
         )
 
         ground.rotation.x = -Math.PI * .5;
-        ground.position.y = -20;
+        ground.position.y = -50;
         // ground.position.z = -1300;
 
         const light = new THREE.DirectionalLight(0xFFFFFF,1);
@@ -95,14 +96,16 @@ class Scene extends THREE.Scene{
         }
 
         const hemi = new THREE.HemisphereLight(0x88BBFF,0xCCBB88,.3);
-        hemi.follow = exampleSkybox;
+        hemi.follow = [exampleSkybox,this.fog];
 
         hemi.update = function(){
-            if(this.follow.material.uniforms){
-                this.intensity = this.follow.material.uniforms.uSunPos.value.y * .5;
+            if(this.follow[0].material.uniforms){
+                this.intensity = this.follow[0].material.uniforms.uSunPos.value.y * .3;
             }else{
                 this.intensity = .3;
             }
+
+            this.color = this.follow[1].color.clone();
         }
 
         this.addChild(exampleSkybox);
@@ -138,7 +141,8 @@ class Scene extends THREE.Scene{
 
             if(this.children[i].name === "sky" ){
                 if(this.children[i].material.uniforms){
-                    this.fog.color.copy(this.children[i].material.uniforms.uHorHardColor.value);
+                    this.fog.color = this.children[i].material.getFogColor();
+
                 }else{
                     this.fog.color.copy(this.children[i].material.color);
 

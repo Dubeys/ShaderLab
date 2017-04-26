@@ -291,7 +291,9 @@ var Cache = function () {
             }
 
             this.progressAll /= this.toLoadCount;
-            this.onProgress(this.progressAll);
+            if (this.onProgress) {
+                this.onProgress(this.progressAll);
+            }
         }
     }]);
 
@@ -543,7 +545,7 @@ var Scene = function (_THREE$Scene) {
 
         _this.prop = {};
 
-        _this.fog = new THREE.FogExp2(0xFFFFFF, 0.002);
+        _this.fog = new THREE.FogExp2(0xFFFFFF, 0.001);
 
         var torusKnot = new THREE.TorusKnotGeometry(10, 3.5, 120, 20);
 
@@ -578,6 +580,7 @@ var Scene = function (_THREE$Scene) {
             if (this.skyShader === 'firewatch') {
                 // this.material.uniforms.uSunPos.value.x = Math.sin(clock.getElapsedTime()/2);
                 // this.material.uniforms.uSunPos.value.z = Math.cos(clock.getElapsedTime()/2);
+                this.material.uniforms.time.value = clock.getElapsedTime();
                 this.material.uniforms.uSunPos.value.y = -.1 + this.nightday;
                 this.material.uniforms.sunInt.value = 1 - this.nightday;
                 this.position.copy(this.material.camera.position);
@@ -598,10 +601,10 @@ var Scene = function (_THREE$Scene) {
             }
         };
 
-        var ground = new THREE.Mesh(new THREE.CircleGeometry(2000, 10), new THREE.MeshPhongMaterial({ color: 0xCCBB88, side: THREE.DoubleSide }));
+        var ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000, 20, 20), new THREE.MeshPhongMaterial({ color: 0xCCBB88, side: THREE.DoubleSide, displacementMap: lib.hm_mountain.raw, displacementScale: 400, shading: THREE.FlatShading }));
 
         ground.rotation.x = -Math.PI * .5;
-        ground.position.y = -20;
+        ground.position.y = -50;
         // ground.position.z = -1300;
 
         var light = new THREE.DirectionalLight(0xFFFFFF, 1);
@@ -623,14 +626,16 @@ var Scene = function (_THREE$Scene) {
         };
 
         var hemi = new THREE.HemisphereLight(0x88BBFF, 0xCCBB88, .3);
-        hemi.follow = exampleSkybox;
+        hemi.follow = [exampleSkybox, _this.fog];
 
         hemi.update = function () {
-            if (this.follow.material.uniforms) {
-                this.intensity = this.follow.material.uniforms.uSunPos.value.y * .5;
+            if (this.follow[0].material.uniforms) {
+                this.intensity = this.follow[0].material.uniforms.uSunPos.value.y * .3;
             } else {
                 this.intensity = .3;
             }
+
+            this.color = this.follow[1].color.clone();
         };
 
         _this.addChild(exampleSkybox);
@@ -669,7 +674,7 @@ var Scene = function (_THREE$Scene) {
 
                 if (this.children[i].name === "sky") {
                     if (this.children[i].material.uniforms) {
-                        this.fog.color.copy(this.children[i].material.uniforms.uHorHardColor.value);
+                        this.fog.color = this.children[i].material.getFogColor();
                     } else {
                         this.fog.color.copy(this.children[i].material.color);
                     }
@@ -817,7 +822,7 @@ var shaderSky = function (_THREE$ShaderMaterial) {
 
         _this.vertexShader = 'uniform float time;\n\n    \t\tvarying vec3 vNormal;\n            varying vec2 vUv;\n            varying vec3 vViewPosition;\n\n    \t\tvoid main() {\n\n                vUv = uv;\n        \t\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n        \t\tvec4 worldPosition = modelMatrix * vec4( position, 1.0 );\n        \t\tvNormal = normalize( normalMatrix * normal );\n                vViewPosition = position;\n        \t\t// vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);\n                // cNormal = normalize( projectionMatrix * vec4(normal));\n\n            }';
 
-        _this.fragmentShader = 'uniform float time;\n            uniform vec3 uColor;\n            uniform vec3 uAtmColor;\n            uniform vec3 uHorColor;\n            uniform vec3 uHorHardColor;\n            uniform vec3 uSunPos;\n            uniform float sunInt;\n            uniform vec3 cameraLookAt;\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {\n            \tfloat d = length(pos - uv) - rad;\n            \tfloat t = clamp(d, 0.0, 1.0);\n            \treturn vec4(color, 1.0 - t);\n            }\n\n            vec3 mod289(vec3 x) {\n              return x - floor(x * (1.0 / 239.0)) * 239.0;\n            }\n\n            vec2 mod289(vec2 x) {\n              return x - floor(x * (1.0 / 289.0)) * 289.0;\n            }\n\n            vec3 permute(vec3 x) {\n              return mod289(((x*34.0)+1.0)*x);\n            }\n\n            float snoise(vec2 v) {\n\n              const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0\n                                  0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)\n                                 -0.577350269189626,  // -1.0 + 2.0 * C.x\n                                  0.024390243902439); // 1.0 / 41.0\n            // First corner\n              vec2 i  = floor(v + dot(v, C.yy) );\n              vec2 x0 = v -   i + dot(i, C.xx);\n\n              vec2 i1;\n              i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);\n              vec4 x12 = x0.xyxy + C.xxzz;\n              x12.xy -= i1;\n\n              i = mod289(i); // Avoid truncation effects in permutation\n              vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))\n            \t\t+ i.x + vec3(0.0, i1.x, 1.0 ));\n\n              vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);\n              m = m*m ;\n              m = m*m ;\n              vec3 x = 2.0 * fract(p * C.www) - 1.0;\n              vec3 h = abs(x) - 0.5;\n              vec3 ox = floor(x + 0.5);\n              vec3 a0 = x - ox;\n              m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );\n              vec3 g;\n              g.x  = a0.x  * x0.x  + h.x  * x0.y;\n              g.yz = a0.yz * x12.xz + h.yz * x12.yw;\n              return 150.0 * dot(m, g);\n            }\n\n            float star(vec2 p) {\n              return step(1.0, smoothstep(0.5, 1.1, snoise(p)));\n            }\n\n    \t\tvoid main() {\n                vec3 nPos = normalize( vViewPosition);\n                vec3 fPos = nPos;\n                nPos = 0.5 + (nPos * 0.5);\n                vec3 gradient = vec3(0.0);\n                vec4 gradient2 = vec4(0.0);\n                vec3 colorAddition = vec3(0.0);\n                vec3 sunPos = normalize(uSunPos);\n\n                float nightdayIntensity = 0.2 + clamp(sunPos.y*.8,0.,1.);\n\n                if(nPos.y > 0.49){\n                    gradient = clamp(mix(uHorColor,uAtmColor,-2.0*0.5+nPos.y*2.0),0.0,1.0);\n                }else{\n                    gradient = clamp(mix(uHorColor,uAtmColor,2.0*0.5-nPos.y*2.0),0.0,0.1);\n                }\n\n                if(nPos.y > 0.49){\n                    gradient2 = clamp(mix(vec4(gradient,0.0),vec4(uHorHardColor,1.0),10.0*0.6-nPos.y*10.0),0.0,1.0);\n                }\n\n                float s1 = star(vUv * 300.);\n                float s2 = star(vUv * 500.5 + vec2(-20.0, 10.0));\n                float s3 = star(vUv * 700.14 + vec2(-75.0, 25.0));\n                vec3 starsLayer = vec3(s1 * 1. + s2 * .6 + s3 * .3 );\n\n                gradient += starsLayer * clamp(1. - sunPos.y * 2.0, 0.0,1.0);\n\n                float dist = distance(sunPos,fPos);\n\n                vec4 sun = vec4(0.0);\n                vec4 sunColor = vec4(0.0);\n                if(dist*30.0 < 1.0){\n                    sun = vec4(1.0);\n                    sunColor = vec4(uColor,1.);\n                }\n\n                float distanceToCamera = (1.0 - clamp(distance(normalize(cameraLookAt),sunPos)*1.2,0.0,1.0)) * .3;\n\n                float dist2 = distance(vec3(sunPos.x,0.0,sunPos.z),vec3(fPos.x*0.5+sunPos.x*0.5,fPos.y*10.0,fPos.z));\n                dist = 0.5 * (1.0 + distanceToCamera) / exp(log(dist)/7.0);\n                dist2 = 0.2 / exp(log(dist2)/4.0);\n                dist += dist2;\n                dist = clamp(dist,0.0,1.0);\n\n                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a);\n\n                vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);\n\n                vec4 mix2 = mix(mix1,rGradient,rGradient.a*2.5 - 1.5);\n\n                if(sun.r > 0.){\n                    mix2 = mix(sun,sunColor,sunInt);\n                }\n\n    \t\t\tgl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);\n\n    \t\t}';
+        _this.fragmentShader = 'uniform float time;\n            uniform vec3 uColor;\n            uniform vec3 uAtmColor;\n            uniform vec3 uHorColor;\n            uniform vec3 uHorHardColor;\n            uniform vec3 uSunPos;\n            uniform float sunInt;\n            uniform vec3 cameraLookAt;\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {\n            \tfloat d = length(pos - uv) - rad;\n            \tfloat t = clamp(d, 0.0, 1.0);\n            \treturn vec4(color, 1.0 - t);\n            }\n\n            vec3 mod289(vec3 x) {\n              return x - floor(x * (1.0 / 239.0)) * 239.0;\n            }\n\n            vec2 mod289(vec2 x) {\n              return x - floor(x * (1.0 / 289.0)) * 289.0;\n            }\n\n            vec3 permute(vec3 x) {\n              return mod289(((x*34.0)+1.0)*x);\n            }\n\n            float snoise(vec2 v) {\n\n              const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0\n                                  0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)\n                                 -0.577350269189626,  // -1.0 + 2.0 * C.x\n                                  0.024390243902439); // 1.0 / 41.0\n            // First corner\n              vec2 i  = floor(v + dot(v, C.yy) );\n              vec2 x0 = v -   i + dot(i, C.xx);\n\n              vec2 i1;\n              i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);\n              vec4 x12 = x0.xyxy + C.xxzz;\n              x12.xy -= i1;\n\n              i = mod289(i); // Avoid truncation effects in permutation\n              vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))\n            \t\t+ i.x + vec3(0.0, i1.x, 1.0 ));\n\n              vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);\n              m = m*m ;\n              m = m*m ;\n              vec3 x = 2.0 * fract(p * C.www) - 1.0;\n              vec3 h = abs(x) - 0.5;\n              vec3 ox = floor(x + 0.5);\n              vec3 a0 = x - ox;\n              m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );\n              vec3 g;\n              g.x  = a0.x  * x0.x  + h.x  * x0.y;\n              g.yz = a0.yz * x12.xz + h.yz * x12.yw;\n              return 150.0 * dot(m, g);\n            }\n\n            float star(vec2 p) {\n              return step(1.0, smoothstep(0.5, 1.1, snoise(p)));\n            }\n\n    \t\tvoid main() {\n                vec3 nPos = normalize( vViewPosition);\n                vec3 fPos = nPos;\n                nPos = 0.5 + (nPos * 0.5);\n                vec3 gradient = vec3(0.0);\n                vec4 gradient2 = vec4(0.0);\n                vec3 colorAddition = vec3(0.0);\n                vec3 sunPos = normalize(uSunPos);\n\n                float nightdayIntensity = 0.2 + clamp(sunPos.y*.8,0.,1.);\n\n                if(nPos.y > 0.49){\n                    gradient = clamp(mix(uHorColor,uAtmColor,-2.0*0.5+nPos.y*2.0),0.0,1.0);\n                }else{\n                    gradient = clamp(mix(uHorColor,uAtmColor,2.0*0.5-nPos.y*2.0),0.0,0.1);\n                }\n\n                if(nPos.y > 0.49){\n                    gradient2 = clamp(mix(vec4(gradient,0.0),vec4(uHorHardColor,1.0),10.0*0.6-nPos.y*10.0),0.0,1.0);\n                }\n\n                float s1 = star(vUv * 300.);\n                float s2 = star(vUv * 500.5 + vec2(-20.0, 10.0));\n                float s3 = star(vUv * 700.14 + vec2(-75.0, 25.0));\n                vec3 starsLayer = vec3(s1 * 1. + s2 * .6 + s3 * .3 );\n\n                gradient += starsLayer * clamp(1. - sunPos.y * 2.0, 0.0,1.0);\n\n                float dist = distance(sunPos,fPos);\n\n                vec4 sun = vec4(0.0);\n                vec4 sunColor = vec4(0.0);\n                if(dist*30.0 < 1.0){\n                    sun = vec4(1.0);\n                    sunColor = vec4(uColor,1.);\n                }\n\n                float distanceToCamera = (1.0 - clamp(distance(normalize(cameraLookAt),sunPos)*1.2,0.0,1.0)) * .3;\n\n                float dist2 = distance(vec3(sunPos.x,0.0,sunPos.z),vec3(fPos.x*0.5+sunPos.x*0.5,fPos.y*10.0,fPos.z));\n                dist = 0.5 * (1.0 + distanceToCamera) / exp(log(dist)/7.0);\n                dist2 = 0.2 / exp(log(dist2)/4.0);\n                dist += dist2;\n                dist = clamp(dist,0.0,1.0);\n\n                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a * (1. - sunPos.y));\n\n                vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);\n\n                vec4 mix2 = mix(mix1,rGradient,rGradient.a*2.5 - 1.5);\n\n                if(sun.r > 0.){\n                    mix2 = mix(sun,sunColor,sunInt);\n                }\n\n    \t\t\tgl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);\n\n    \t\t}';
         return _this;
     }
 
@@ -826,6 +831,16 @@ var shaderSky = function (_THREE$ShaderMaterial) {
         value: function calculateLookAt() {
             // console.log(this.camera.quaternion);
             this.uniforms.cameraLookAt.value = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        }
+    }, {
+        key: 'getFogColor',
+        value: function getFogColor() {
+            var fog = this.uniforms.uHorHardColor.value.clone();
+            var alpha = this.uniforms.cameraLookAt.value.distanceTo(this.uniforms.uSunPos.value) * 1.2;
+            alpha = alpha > 1 ? 1 : alpha < 0 ? 0 : alpha;
+            fog.lerp(this.uniforms.uHorColor.value, alpha * .5 * (1 + this.uniforms.uSunPos.value.y * .8));
+            fog.multiplyScalar(1 + (1 - alpha) * 1.3);
+            return fog.clone();
         }
     }, {
         key: 'horizonLine',

@@ -202,7 +202,9 @@ class Cache {
         }
 
         this.progressAll /= this.toLoadCount;
-        this.onProgress(this.progressAll);
+        if(this.onProgress){
+            this.onProgress(this.progressAll);
+        }
     }
 
 }
