@@ -24,8 +24,8 @@ class shaderSky extends THREE.ShaderMaterial{
                 uHorHardColor: {value: horizonLine},
                 uSunPos: {value: sunPosition},
                 sunInt: {value: 0},
-                cameraLookAt: {value: this.cameraLookAt}
-                // clouds: {value: clouds}
+                cameraLookAt: {value: this.cameraLookAt},
+                clouds: {value: clouds}
             }
 
         this.vertexShader =
@@ -58,7 +58,7 @@ class shaderSky extends THREE.ShaderMaterial{
             uniform vec3 uSunPos;
             uniform float sunInt;
             uniform vec3 cameraLookAt;
-            // uniform sampler2D clouds;
+            uniform sampler2D clouds;
 
     		varying vec3 vNormal;
     		varying vec3 vViewPosition;
@@ -174,13 +174,11 @@ class shaderSky extends THREE.ShaderMaterial{
                     mix2 = mix(sun,sunColor,sunInt);
                 }
 
-    			gl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);
-
-                //clouds calculation wip;
-                // vec2 nUv = fPos.xz * (1.2 - fPos.y );
-                // nUv = .5 + nUv * .5;
-                // vec4 cloudsColor = mix(vec4(uHorHardColor.rgb,0.),vec4(uHorHardColor.rgb,1.),texture2D(clouds,nUv + vec2(time/100.,time/100.)).r);
-                // gl_FragColor = mix(vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0) , cloudsColor, cloudsColor.a );
+    			// gl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);
+                vec2 nUv = fPos.xz * (1.2 - fPos.y );
+                nUv = .5 + nUv * .5;
+                vec4 cloudsColor = mix(vec4(uHorHardColor.rgb,0.),vec4(uHorHardColor.rgb,1.),texture2D(clouds,nUv + vec2(time/100.,time/100.)).r);
+                gl_FragColor = mix(vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0) , cloudsColor, cloudsColor.a );
 
     		}`
     }

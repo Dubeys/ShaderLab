@@ -37,7 +37,7 @@ class Scene extends THREE.Scene{
 
         const skyShader = {
             color: new THREE.MeshBasicMaterial({color: 0x000000,side: THREE.BackSide}),
-            firewatch: new shaderSky({camera: this.camera})
+            firewatch: new shaderSky({camera: this.camera,clouds: this.lib.clouds.raw})
         };
 
         const exampleSkybox = new THREE.Mesh(skyBox,skyShader.color);
