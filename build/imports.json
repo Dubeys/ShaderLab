@@ -9,5 +9,23 @@
         "type" : "texture",
         "url" : "assets/textures/clouds.png",
         "name" : "clouds"
+    },
+
+    {
+        "type" : "texture",
+        "url" : "assets/textures/lut32_nightgrade.png",
+        "name" : "nightgrade"
+    },
+
+    {
+        "type" : "texture",
+        "url" : "assets/textures/lut32_neutral.png",
+        "name" : "neutralgrade"
+    },
+
+    {
+        "type" : "texture",
+        "url" : "assets/textures/lut32_sat.png",
+        "name" : "satgrade"
     }
 ]

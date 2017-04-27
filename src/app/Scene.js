@@ -29,7 +29,7 @@ class Scene extends THREE.Scene{
             this.material = this.shaders[this.torusShader];
         }
 
-        const skyBox = new THREE.IcosahedronGeometry(2000,1);
+        const skyBox = new THREE.IcosahedronGeometry(3000,1);
 
         this.lib.clouds.raw.wrapS = THREE.RepeatWrapping;
         this.lib.clouds.raw.wrapT = THREE.RepeatWrapping;
@@ -51,7 +51,7 @@ class Scene extends THREE.Scene{
             if(this.skyShader === 'firewatch'){
 
                 this.position.copy(this.material.camera.position);
-                this.material.setSunAngle(180);
+                this.material.setSunAngle(clock.getElapsedTime()*100.);
                 this.material.update(clock);
                 this.material.setTimeOfDay(this.nightday, [20,55] , 1, [195,230], 1);
             }else{

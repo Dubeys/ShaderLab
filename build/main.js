@@ -25,7 +25,6 @@ var App = function () {
         this.renderer.autoClear = false;
         // this.renderer.setClearColor(0xCCCCFF);
 
-        this.renderer.setPixelRatio(2);
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         // this.renderer.shadowMapWidth = 4096;
@@ -36,9 +35,43 @@ var App = function () {
         // this.controls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
         this.mirror = new THREE.CubeCamera(1, 50000, 1024);
 
-        this.postProcess = false;
-
         this.clock = new THREE.Clock();
+
+        this.post = {};
+
+        var size = this.renderer.getSize();
+
+        this.post.renderTarget = new THREE.WebGLRenderTarget(size.width * 2, size.height * 2, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            stencilBuffer: false
+        });
+        this.post.readTarget = new THREE.WebGLRenderTarget(size.width * 2, size.height * 2, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            stencilBuffer: false
+        });
+        this.post.depthTarget = new THREE.WebGLRenderTarget(size.width, size.height, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            stencilBuffer: false
+        });
+
+        this.post.depthTarget.depthTexture = new THREE.DepthTexture(size.width, size.height, THREE.UnsignedIntType);
+
+        this.post.material = new shaderPost(); // custom shader
+        this.post.materialVertical = new shaderPostVBlur(); // custom shader
+
+        this.post.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        this.post.scene = new THREE.Scene();
+
+        this.post.quad = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), null);
+        this.post.quad.frustumCulled = false; // Avoid getting clipped
+
+        this.post.scene.add(this.post.quad);
     }
 
     _createClass(App, [{
@@ -48,6 +81,8 @@ var App = function () {
             document.body.appendChild(this.renderer.domElement);
             this.inputs = new Inputs();
             this.inputs.onResize(App.setSize.bind(this));
+            this.lib = lib;
+            this.lib.nightgrade.raw.minFilter = THREE.NearestFilter;
 
             this.level = new Scene(this.camera, lib, this.inputs);
 
@@ -71,8 +106,7 @@ var App = function () {
         key: 'render',
         value: function render() {
             this.renderer.clear();
-            this.renderer.setScissorTest(false);
-            this.renderer.render(this.level, this.camera);
+            this.postProcess();
         }
     }, {
         key: 'cameraControlsUpdate',
@@ -85,6 +119,41 @@ var App = function () {
 
             var vector = new THREE.Vector3(Math.cos(this.cameraTarget.y) * Math.sin(this.cameraTarget.x), Math.cos(this.cameraTarget.x), Math.sin(this.cameraTarget.y) * Math.sin(this.cameraTarget.x)).multiplyScalar(2000);
             this.camera.lookAt(vector);
+        }
+    }, {
+        key: 'postProcess',
+        value: function postProcess(opts) {
+
+            var size = this.renderer.getSize();
+
+            this.post.renderTarget.setSize(size.width * 2, size.height * 2);
+            this.post.depthTarget.setSize(size.width, size.height);
+            this.post.readTarget.setSize(size.width, size.height);
+            this.level.children[0].visible = false;
+            this.renderer.render(this.level, this.camera, this.post.depthTarget, true);
+            this.level.children[0].visible = true;
+            this.renderer.render(this.level, this.camera, this.post.renderTarget, true);
+
+            this.post.materialVertical.uniforms.render.value = this.post.renderTarget.texture;
+            this.post.materialVertical.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
+            this.post.materialVertical.uniforms.cameraNear.value = this.camera.near;
+            this.post.materialVertical.uniforms.cameraFar.value = 4000;
+            this.post.materialVertical.uniforms.size.value.set(size.width * 1., size.height * 1.);
+
+            this.post.quad.material = this.post.materialVertical;
+
+            this.renderer.render(this.post.scene, this.post.camera, this.post.readTarget, true);
+
+            this.post.material.uniforms.render.value = this.post.readTarget.texture;
+            this.post.material.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
+            this.post.material.uniforms.lut.value = this.lib.nightgrade.raw;
+            this.post.material.uniforms.cameraNear.value = this.camera.near;
+            this.post.material.uniforms.cameraFar.value = 4000;
+            this.post.material.uniforms.size.value.set(size.width * 1., size.height * 1.);
+
+            this.post.quad.material = this.post.material;
+
+            this.renderer.render(this.post.scene, this.post.camera);
         }
     }], [{
         key: 'setSize',
@@ -562,7 +631,7 @@ var Scene = function (_THREE$Scene) {
             this.material = this.shaders[this.torusShader];
         };
 
-        var skyBox = new THREE.IcosahedronGeometry(2000, 1);
+        var skyBox = new THREE.IcosahedronGeometry(3000, 1);
 
         _this.lib.clouds.raw.wrapS = THREE.RepeatWrapping;
         _this.lib.clouds.raw.wrapT = THREE.RepeatWrapping;
@@ -584,7 +653,7 @@ var Scene = function (_THREE$Scene) {
             if (this.skyShader === 'firewatch') {
 
                 this.position.copy(this.material.camera.position);
-                this.material.setSunAngle(180);
+                this.material.setSunAngle(clock.getElapsedTime() * 100.);
                 this.material.update(clock);
                 this.material.setTimeOfDay(this.nightday, [20, 55], 1, [195, 230], 1);
             } else {
@@ -756,6 +825,73 @@ document.addEventListener('DOMContentLoaded', function () {
 
     CACHE.loadJSONList('build/imports.json');
 });
+"use strict";
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var shaderPost = function (_THREE$ShaderMaterial) {
+    _inherits(shaderPost, _THREE$ShaderMaterial);
+
+    function shaderPost() {
+        _classCallCheck(this, shaderPost);
+
+        var _this = _possibleConstructorReturn(this, (shaderPost.__proto__ || Object.getPrototypeOf(shaderPost)).call(this));
+
+        _this.uniforms = {
+            render: { value: null },
+            lut: { value: null },
+            renderDepth: { value: null },
+            cameraNear: { value: null },
+            cameraFar: { value: null },
+            size: { value: new THREE.Vector2() }
+        };
+
+        _this.vertexShader = "\n            varying vec2 vUv;\n\n            void main(){\n                vUv = uv;\n                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n            }\n        ";
+
+        _this.fragmentShader = "\n            #include <packing>\n\n            uniform sampler2D render;\n            uniform sampler2D lut;\n            uniform sampler2D renderDepth;\n            uniform float cameraNear;\n            uniform float cameraFar;\n\n            uniform vec2 size;\n\n            varying vec2 vUv;\n\n            // Ref: http://www.khronos.org/webgl/wiki/WebGL_and_OpenGL_Differences#No_3D_Texture_support\n            vec4 sampleAs3DTexture( sampler2D tex, vec3 texCoord, float size ) {\n              float sliceSize = 1.0 / size;                         // space of 1 slice\n              float slicePixelSize = sliceSize / size;              // space of 1 pixel\n              float sliceInnerSize = slicePixelSize * (size - 1.0); // space of size pixels\n              float zSlice0 = min(floor(texCoord.z * size), size - 1.0);\n              float zSlice1 = min(zSlice0 + 1.0, size - 1.0);\n              float xOffset = slicePixelSize * 0.5 + texCoord.x * sliceInnerSize;\n              float s0 = xOffset + (zSlice0 * sliceSize);\n              float s1 = xOffset + (zSlice1 * sliceSize);\n              vec4 slice0Color = texture2D(tex, vec2(s0, texCoord.y));\n              vec4 slice1Color = texture2D(tex, vec2(s1, texCoord.y));\n              float zOffset = mod(texCoord.z * size, 1.0);\n              return mix(slice0Color, slice1Color, zOffset);\n            }\n\n            vec4 blur9(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {\n              vec4 color = vec4(0.0);\n              vec2 off1 = vec2(1.3846153846) * direction;\n              vec2 off2 = vec2(3.2307692308) * direction;\n              color += texture2D(image, uv) * 0.2270270270;\n              color += texture2D(image, uv + (off1 / resolution)) * 0.3162162162;\n              color += texture2D(image, uv - (off1 / resolution)) * 0.3162162162;\n              color += texture2D(image, uv + (off2 / resolution)) * 0.0702702703;\n              color += texture2D(image, uv - (off2 / resolution)) * 0.0702702703;\n              return color;\n            }\n\n            float readDepth(sampler2D tDepth,vec2 coord,float cameraNear, float cameraFar){\n                float fragCoordZ = texture2D(tDepth, coord).x;\n\t\t\t\tfloat viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );\n\t\t\t\treturn viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );\n            }\n\n            void main(){\n                float depth = readDepth(renderDepth,vUv,cameraNear,cameraFar);\n                vec4 blurredImage = vec4(0.0);\n                if(depth >= 1.0){\n                    blurredImage = blur9(render,vUv,size,vec2(depth,-depth))*.5;\n                    blurredImage += blur9(render,vUv,size,vec2(-depth,depth))*.5;\n                }else{\n                    blurredImage = blur9(render,vUv,size,vec2(depth * 2.5,-depth * 2.5))*.5;\n                    blurredImage += blur9(render,vUv,size,vec2(-depth * 2.5,depth * 2.5))*.5;\n                }\n                // image.y = 1. - image.y;\n                // vec4 colorCorect = sampleAs3DTexture(lut,image.xyz,16.);\n                gl_FragColor = blurredImage;\n            }\n        ";
+
+        return _this;
+    }
+
+    return shaderPost;
+}(THREE.ShaderMaterial);
+"use strict";
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var shaderPostVBlur = function (_THREE$ShaderMaterial) {
+    _inherits(shaderPostVBlur, _THREE$ShaderMaterial);
+
+    function shaderPostVBlur() {
+        _classCallCheck(this, shaderPostVBlur);
+
+        var _this = _possibleConstructorReturn(this, (shaderPostVBlur.__proto__ || Object.getPrototypeOf(shaderPostVBlur)).call(this));
+
+        _this.uniforms = {
+            render: { value: null },
+            renderDepth: { value: null },
+            cameraNear: { value: null },
+            cameraFar: { value: null },
+            size: { value: new THREE.Vector2() }
+        };
+
+        _this.vertexShader = "\n            varying vec2 vUv;\n\n            void main(){\n                vUv = uv;\n                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n            }\n        ";
+
+        _this.fragmentShader = "\n            #include <packing>\n\n            uniform sampler2D render;\n            uniform sampler2D renderDepth;\n            uniform float cameraNear;\n            uniform float cameraFar;\n\n            uniform vec2 size;\n\n            varying vec2 vUv;\n\n            vec4 blur9(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {\n              vec4 color = vec4(0.0);\n              vec2 off1 = vec2(1.3846153846) * direction;\n              vec2 off2 = vec2(3.2307692308) * direction;\n              color += texture2D(image, uv) * 0.2270270270;\n              color += texture2D(image, uv + (off1 / resolution)) * 0.3162162162;\n              color += texture2D(image, uv - (off1 / resolution)) * 0.3162162162;\n              color += texture2D(image, uv + (off2 / resolution)) * 0.0702702703;\n              color += texture2D(image, uv - (off2 / resolution)) * 0.0702702703;\n              return color;\n            }\n\n            float readDepth(sampler2D tDepth,vec2 coord,float cameraNear, float cameraFar){\n                float fragCoordZ = texture2D(tDepth, coord).x;\n\t\t\t\tfloat viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );\n\t\t\t\treturn viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );\n            }\n\n            void main(){\n                float depth = readDepth(renderDepth,vUv,cameraNear,cameraFar);\n                vec4 color = texture2D(render,vUv);\n                vec4 blurredImage = vec4(0.0);\n                if(depth >= 1.0){\n                    blurredImage = blur9(render,vUv,size,vec2(depth ))*.5;\n                    blurredImage += blur9(render,vUv,size,vec2(-depth ))*.5;\n                }else{\n                    blurredImage = blur9(render,vUv,size,vec2(depth * 2.5))*.5;\n                    blurredImage += blur9(render,vUv,size,vec2(-depth * 2.5))*.5;\n                }\n                gl_FragColor = blurredImage;\n            }\n        ";
+
+        return _this;
+    }
+
+    return shaderPostVBlur;
+}(THREE.ShaderMaterial);
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
