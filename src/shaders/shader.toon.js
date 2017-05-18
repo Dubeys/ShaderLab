@@ -1,5 +1,5 @@
 class shaderToon extends THREE.ShaderMaterial{
-    constructor({color = 0xFFFFFF,shadowColor = 'rgb(30,30,30)',colorMap,normalMap,opacity = 1}){
+    constructor({color = 0xFFFFFF,shadowColor = 'rgb(30,30,30)',colorMap,normalMap,opacity = 1} = {}){
 
         super();
 
@@ -32,31 +32,31 @@ class shaderToon extends THREE.ShaderMaterial{
             this.uniforms.repeat = {value: colorMap.repeat};
         }
 
-        this.vertexShader = [
+        this.vertexShader = `
 
-    		"varying vec3 vNormal;",
-    		// "varying vec3 cNormal;",
-            // "varying vec3 vPos;",
-            "varying vec2 vUv;",
-            "varying vec3 vViewPosition;",
+    		varying vec3 vNormal;
+    		// varying vec3 cNormal;
+            // varying vec3 vPos;
+            varying vec2 vUv;
+            varying vec3 vViewPosition;
 
-            THREE.ShaderChunk['shadowmap_pars_vertex'],
+            #include <shadowmap_pars_vertex>
 
-    		"void main() {",
+    		void main() {
 
-                "vUv = uv;",
-        		"gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
-        		"vec4 worldPosition = modelMatrix * vec4( position, 1.0 );",
-        		"vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );",
-                THREE.ShaderChunk['shadowmap_vertex'],
-        		"vNormal = normalize( normalMatrix * normal );",
-                "vViewPosition = - mvPosition.xyz;",
-        		// "vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);",
-        		// "cNormal = normalize( projectionMatrix * vec4(normal));",
+                vUv = uv;
+        		gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        		vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+        		vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                #include <shadowmap_vertex>
+        		vNormal = normalize( normalMatrix * normal );
+                vViewPosition = mvPosition.xyz;
+        		// "vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);
+        		// "cNormal = normalize( projectionMatrix * vec4(normal));
 
-            "}"
+            }
 
-    	].join("\n");
+        `
 
     	this.fragmentShader = `
 
@@ -79,6 +79,7 @@ class shaderToon extends THREE.ShaderMaterial{
             struct PointLight {
                 vec3 position;
                 vec3 color;
+                float distance;
                 int shadow;
                 float shadowBias;
                 float shadowRadius;
@@ -90,6 +91,7 @@ class shaderToon extends THREE.ShaderMaterial{
                 vec3 direction;
                 vec3 groundColor;
             };
+
             #if NUM_DIR_LIGHTS > 0
             uniform DirectionalLight directionalLights[ NUM_DIR_LIGHTS ];
             #endif
@@ -101,7 +103,6 @@ class shaderToon extends THREE.ShaderMaterial{
             #endif
 
     		varying vec3 vNormal;
-    		// varying vec3 vPos;
     		varying vec3 vViewPosition;
     		varying vec2 vUv;
 
@@ -124,6 +125,10 @@ class shaderToon extends THREE.ShaderMaterial{
                 // vec3 fColor = color * directionalLights[0].color;
                 vec3 fColor = color;
 
+                if(colorMapEnabled){
+                    fColor = texture2D(colorMap,vUv*repeat).xyz;
+                }
+
                 float shadowMask = getShadowMask();
 
                 float diffuse = 0.0;
@@ -133,16 +138,17 @@ class shaderToon extends THREE.ShaderMaterial{
                     vec3 lDirection = vViewPosition - pointLights[l].position;
                     vec3 lVector = normalize( lDirection.xyz );
                     float dotLight = dot( normal,-lVector );
-                    diffuse += dotLight;
+                    float d = length(lDirection) / pointLights[l].distance;
+                    diffuse += clamp(dotLight,0.,1.) * clamp(1./(d*d),0.,1.);
                     // fColor *= pointLights[l].color * clamp(1. - length(lDirection) * .0001, .5, 1.);
-                    fColor *= pointLights[l].color ;
+                    fColor *= pointLights[l].color;
                 };
                 #endif
 
                 #if NUM_DIR_LIGHTS > 0
                 for(int l = 0; l < NUM_POINT_LIGHTS; l++){
                     float dotLight = dot( normal,directionalLights[l].direction )
-                    diffuse += dotLight;
+                    diffuse += clamp(dotLight,0.,1.);
                     fColor *= directionalLights[l].color
                 };
                 #endif
@@ -156,14 +162,11 @@ class shaderToon extends THREE.ShaderMaterial{
                     }
                 #endif
 
-                if(colorMapEnabled){
-                    fColor = texture2D(colorMap,vUv*repeat).xyz;
-                }
                 vec3 finalColor = fColor;
 
     			if ( diffuse > 0.99 ) { finalColor = vec3(1.0) * clamp(length(fColor) * 10., 0.,1.) ; }
     			else if ( diffuse > 0.5 ) { finalColor = fColor; }
-    			else if ( diffuse > -0.1 ) { finalColor = clamp(fColor,0.,1.) * (shadowColor + .5); }
+    			else if ( diffuse > 0.0 ) { finalColor = clamp(fColor,0.,1.) * (shadowColor + .5); }
     			else { finalColor = clamp(fColor,0.,1.) * shadowColor; }
     			finalColor = mix(clamp(fColor,0.,1.) * shadowColor,finalColor,shadowMask);
 
@@ -175,5 +178,11 @@ class shaderToon extends THREE.ShaderMaterial{
         if(normalMap){
             this.fragmentShader = "#define USE_NORMALMAP \n" + this.fragmentShader
         }
+
+    }
+
+    set map(img){
+        this.uniforms.colorMap.value = img;
+        this.uniforms.colorMapEnabled.value = true;
     }
 }
