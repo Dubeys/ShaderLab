@@ -29,11 +29,13 @@ class Scene extends THREE.Scene{
             this.material = this.shaders[this.torusShader];
         }
 
+        exampleObject.castShadow = true;
+        exampleObject.receiveShadow = true;
+
         const skyBox = new THREE.IcosahedronGeometry(3000,1);
 
         this.lib.clouds.raw.wrapS = THREE.RepeatWrapping;
         this.lib.clouds.raw.wrapT = THREE.RepeatWrapping;
-        console.log(this.lib.clouds.raw)
 
         const skyShader = {
             color: new THREE.MeshBasicMaterial({color: 0x000000,side: THREE.BackSide}),
@@ -70,11 +72,23 @@ class Scene extends THREE.Scene{
 
         ground.rotation.x = -Math.PI * .5;
         ground.position.y = -50;
+        ground.receiveShadow = true;
+        // ground.castShadow = true;
         // ground.position.z = -1300;
 
-        const light = new THREE.DirectionalLight(0xFFFFFF,1);
+        const light = new THREE.PointLight(0xFFFFFF,1);
         light.position.set(-10,20,15);
         light.follow = exampleSkybox;
+        // light.castShadow = true;
+        // light.shadow.mapSize.width = 2048;
+        // light.shadow.mapSize.height = 2048;
+        // light.shadow.bias = -0.0001;
+        // light.shadow.camera.top = 500;
+        // light.shadow.camera.bottom = -500;
+        // light.shadow.camera.right = 500;
+        // light.shadow.camera.left = -500;
+        // light.shadow.camera.near = 100;
+        // light.shadow.camera.far = 4000;
 
         light.update = function(){
             if(this.follow.material.uniforms){
@@ -90,7 +104,7 @@ class Scene extends THREE.Scene{
             }
         }
 
-        const hemi = new THREE.HemisphereLight(0x88BBFF,0xCCBB88,.3);
+        const hemi = new THREE.HemisphereLight(0x3399FF,0xCC8833,.3);
         hemi.follow = [exampleSkybox,this.fog];
 
         hemi.update = function(){

@@ -27,8 +27,8 @@ var App = function () {
 
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        // this.renderer.shadowMapWidth = 4096;
-        // this.renderer.shadowMapHeight = 4096;
+        this.renderer.shadowMapWidth = 4096;
+        this.renderer.shadowMapHeight = 4096;
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 10000);
         this.cameraTarget = new THREE.Vector2(Math.PI / 2, -Math.PI / 2);
@@ -631,11 +631,13 @@ var Scene = function (_THREE$Scene) {
             this.material = this.shaders[this.torusShader];
         };
 
+        exampleObject.castShadow = true;
+        exampleObject.receiveShadow = true;
+
         var skyBox = new THREE.IcosahedronGeometry(3000, 1);
 
         _this.lib.clouds.raw.wrapS = THREE.RepeatWrapping;
         _this.lib.clouds.raw.wrapT = THREE.RepeatWrapping;
-        console.log(_this.lib.clouds.raw);
 
         var skyShader = {
             color: new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide }),
@@ -669,11 +671,23 @@ var Scene = function (_THREE$Scene) {
 
         ground.rotation.x = -Math.PI * .5;
         ground.position.y = -50;
+        ground.receiveShadow = true;
+        // ground.castShadow = true;
         // ground.position.z = -1300;
 
-        var light = new THREE.DirectionalLight(0xFFFFFF, 1);
+        var light = new THREE.PointLight(0xFFFFFF, 1);
         light.position.set(-10, 20, 15);
         light.follow = exampleSkybox;
+        // light.castShadow = true;
+        // light.shadow.mapSize.width = 2048;
+        // light.shadow.mapSize.height = 2048;
+        // light.shadow.bias = -0.0001;
+        // light.shadow.camera.top = 500;
+        // light.shadow.camera.bottom = -500;
+        // light.shadow.camera.right = 500;
+        // light.shadow.camera.left = -500;
+        // light.shadow.camera.near = 100;
+        // light.shadow.camera.far = 4000;
 
         light.update = function () {
             if (this.follow.material.uniforms) {
@@ -689,7 +703,7 @@ var Scene = function (_THREE$Scene) {
             }
         };
 
-        var hemi = new THREE.HemisphereLight(0x88BBFF, 0xCCBB88, .3);
+        var hemi = new THREE.HemisphereLight(0x3399FF, 0xCC8833, .3);
         hemi.follow = [exampleSkybox, _this.fog];
 
         hemi.update = function () {
@@ -1063,16 +1077,18 @@ var shaderToon = function (_THREE$ShaderMaterial) {
     _inherits(shaderToon, _THREE$ShaderMaterial);
 
     function shaderToon(_ref) {
-        var color = _ref.color,
-            shadowColor = _ref.shadowColor,
+        var _ref$color = _ref.color,
+            color = _ref$color === undefined ? 0xFFFFFF : _ref$color,
+            _ref$shadowColor = _ref.shadowColor,
+            shadowColor = _ref$shadowColor === undefined ? 'rgb(30,30,30)' : _ref$shadowColor,
             colorMap = _ref.colorMap,
-            normalMap = _ref.normalMap;
+            normalMap = _ref.normalMap,
+            _ref$opacity = _ref.opacity,
+            opacity = _ref$opacity === undefined ? 1 : _ref$opacity;
 
         _classCallCheck(this, shaderToon);
 
         var _this = _possibleConstructorReturn(this, (shaderToon.__proto__ || Object.getPrototypeOf(shaderToon)).call(this));
-
-        var shadow = new THREE.Color(shadowColor) || new THREE.Color('rgb(30,30,30)');
 
         _this.side = THREE.DoubleSide;
         _this.lights = true;
@@ -1086,12 +1102,13 @@ var shaderToon = function (_THREE$ShaderMaterial) {
         _this.extensions.derivatives = true;
 
         _this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib['lights'], THREE.UniformsLib["shadowmap"], {
-            uShadowColor: { value: shadow },
+            uShadowColor: { value: new THREE.Color(shadowColor) },
             color: { value: new THREE.Color(color) },
             colorMapEnabled: { value: colorMapEnabled },
             colorMap: { type: 't', value: colorMap },
             normalMap: { type: 't', value: normalMap },
-            normalScale: { value: new THREE.Vector2(1, 1) }
+            normalScale: { value: new THREE.Vector2(1, 1) },
+            opacity: { value: opacity }
         }]);
 
         if (colorMap) {
@@ -1107,22 +1124,7 @@ var shaderToon = function (_THREE$ShaderMaterial) {
 
         "}"].join("\n");
 
-        _this.fragmentShader = ["uniform vec3 uShadowColor;", "uniform vec3 color;", "uniform bool colorMapEnabled;", "uniform sampler2D colorMap;", "uniform vec2 repeat;", "struct DirectionalLight {", "vec3 direction;", "vec3 color;", "int shadow;", "float shadowBias;", "float shadowRadius;", "vec2 shadowMapSize;", "};", "struct HemisphereLight {", "vec3 skyColor;", "vec3 direction;", "vec3 groundColor;", "};", "uniform DirectionalLight directionalLights[ NUM_DIR_LIGHTS ];", "#if NUM_HEMI_LIGHTS > 0", "uniform HemisphereLight hemisphereLights[ NUM_HEMI_LIGHTS ];", "#endif", "varying vec3 vNormal;", "varying vec3 vPos;", "varying vec3 vViewPosition;", "varying vec2 vUv;",
-
-        // THREE.ShaderChunk['lights_pars'],
-        THREE.ShaderChunk['packing'], THREE.ShaderChunk['normalmap_pars_fragment'], THREE.ShaderChunk['shadowmap_pars_fragment'], THREE.ShaderChunk['shadowmask_pars_fragment'], "void main() {", THREE.ShaderChunk['normal_flip'], THREE.ShaderChunk['normal_fragment'], "vec3 shadowColor = uShadowColor;", "#if NUM_HEMI_LIGHTS > 0", "for(int i = 0; i < NUM_HEMI_LIGHTS; i++){", "float dotNL = dot( normal, hemisphereLights[i].direction );", "float hemiDiffuseWeight = 0.5 * dotNL + 0.5;", "vec3 irradiance = mix( hemisphereLights[i].groundColor, hemisphereLights[i].skyColor, hemiDiffuseWeight );", "shadowColor += irradiance;", "}", "#endif", "vec3 outgoingLight = vec3(1.0);", "float colorInt = length(directionalLights[0].color);", "vec3 fColor = color * directionalLights[0].color;",
-        // "fColor = mix(fColor, directionalLights[0].color,colorInt);",
-        "vec3 finalColor = fColor;", "if(colorMapEnabled){", "fColor = texture2D(colorMap,vUv*repeat).xyz;", "}",
-        // compute direction to light
-        "shadowColor = shadowColor ;", "float diffuse = 0.0;",
-        // loop for THREE Lights
-        // "for(int l = 0; l < NUM_POINT_LIGHTS; l++){",
-        // "vec3 lDirection = vPos - pointLights[0].position;",
-        // "vec3 lVector = normalize( lDirection.xyz );",
-        // "diffuse += dot( normal,-lVector );",
-        "diffuse += dot( normal,directionalLights[0].direction );",
-        // "};",
-        "if ( diffuse > 0.99 ) { finalColor = vec3(1.0) * colorInt * 3.; }", "else if ( diffuse > 0.5 ) { finalColor = fColor; }", "else if ( diffuse > -0.1 ) { finalColor = clamp(fColor,0.,1.) * (shadowColor + .5); }", "else { finalColor = clamp(fColor,0.,1.) * shadowColor; }", "gl_FragColor = vec4( finalColor*clamp(getShadowMask(),0.3,1.0),1.0);", "}"].join("\n");
+        _this.fragmentShader = '\n\n    \t\tuniform vec3 uShadowColor;\n            uniform vec3 color;\n            uniform bool colorMapEnabled;\n            uniform sampler2D colorMap;\n            uniform vec2 repeat;\n            uniform float opacity;\n\n            struct DirectionalLight {\n                vec3 direction;\n                vec3 color;\n                int shadow;\n                float shadowBias;\n                float shadowRadius;\n                vec2 shadowMapSize;\n            };\n\n            struct PointLight {\n                vec3 position;\n                vec3 color;\n                int shadow;\n                float shadowBias;\n                float shadowRadius;\n                vec2 shadowMapSize;\n            };\n\n            struct HemisphereLight {\n                vec3 skyColor;\n                vec3 direction;\n                vec3 groundColor;\n            };\n            #if NUM_DIR_LIGHTS > 0\n            uniform DirectionalLight directionalLights[ NUM_DIR_LIGHTS ];\n            #endif\n            #if NUM_POINT_LIGHTS > 0\n            uniform PointLight pointLights[ NUM_POINT_LIGHTS ];\n            #endif\n            #if NUM_HEMI_LIGHTS > 0\n            uniform HemisphereLight hemisphereLights[ NUM_HEMI_LIGHTS ];\n            #endif\n\n    \t\tvarying vec3 vNormal;\n    \t\t// varying vec3 vPos;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            #include <packing>\n            #include <normalmap_pars_fragment>\n            #include <shadowmap_pars_fragment>\n            #include <shadowmask_pars_fragment>\n\n    \t\tvoid main() {\n\n                #include <normal_flip>\n                #include <normal_fragment>\n                vec3 shadowColor = uShadowColor;\n\n                vec3 outgoingLight = vec3(1.0);\n\n                // float colorInt = length(directionalLights[0].color);\n                float colorInt = 0.;\n\n                // vec3 fColor = color * directionalLights[0].color;\n                vec3 fColor = color;\n\n                float shadowMask = getShadowMask();\n\n                float diffuse = 0.0;\n\n                #if NUM_POINT_LIGHTS > 0\n                for(int l = 0; l < NUM_POINT_LIGHTS; l++){\n                    vec3 lDirection = vViewPosition - pointLights[l].position;\n                    vec3 lVector = normalize( lDirection.xyz );\n                    float dotLight = dot( normal,-lVector );\n                    diffuse += dotLight;\n                    // fColor *= pointLights[l].color * clamp(1. - length(lDirection) * .0001, .5, 1.);\n                    fColor *= pointLights[l].color ;\n                };\n                #endif\n\n                #if NUM_DIR_LIGHTS > 0\n                for(int l = 0; l < NUM_POINT_LIGHTS; l++){\n                    float dotLight = dot( normal,directionalLights[l].direction )\n                    diffuse += dotLight;\n                    fColor *= directionalLights[l].color\n                };\n                #endif\n\n                #if NUM_HEMI_LIGHTS > 0\n                    for(int i = 0; i < NUM_HEMI_LIGHTS; i++){\n                        float dotNL = dot( normal, hemisphereLights[i].direction );\n                \t\tfloat hemiDiffuseWeight = 0.5 * dotNL + 0.5;\n                \t\tvec3 irradiance = mix( hemisphereLights[i].groundColor, hemisphereLights[i].skyColor, hemiDiffuseWeight );\n                \t\tshadowColor += irradiance;\n                    }\n                #endif\n\n                if(colorMapEnabled){\n                    fColor = texture2D(colorMap,vUv*repeat).xyz;\n                }\n                vec3 finalColor = fColor;\n\n    \t\t\tif ( diffuse > 0.99 ) { finalColor = vec3(1.0) * clamp(length(fColor) * 10., 0.,1.) ; }\n    \t\t\telse if ( diffuse > 0.5 ) { finalColor = fColor; }\n    \t\t\telse if ( diffuse > -0.1 ) { finalColor = clamp(fColor,0.,1.) * (shadowColor + .5); }\n    \t\t\telse { finalColor = clamp(fColor,0.,1.) * shadowColor; }\n    \t\t\tfinalColor = mix(clamp(fColor,0.,1.) * shadowColor,finalColor,shadowMask);\n\n    \t\t\tgl_FragColor = vec4( finalColor,clamp(opacity,0.,1.));\n\n    \t\t}\n        ';
 
         if (normalMap) {
             _this.fragmentShader = "#define USE_NORMALMAP \n" + _this.fragmentShader;

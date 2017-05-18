@@ -12,8 +12,8 @@ class App {
 
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        // this.renderer.shadowMapWidth = 4096;
-        // this.renderer.shadowMapHeight = 4096;
+        this.renderer.shadowMapWidth = 4096;
+        this.renderer.shadowMapHeight = 4096;
 
         this.camera = new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.01,10000);
         this.cameraTarget = new THREE.Vector2(Math.PI/2,-Math.PI/2);
