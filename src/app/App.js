@@ -47,7 +47,7 @@ class App {
 
         this.post.depthTarget.depthTexture = new THREE.DepthTexture(size.width,size.height,THREE.UnsignedIntType);
 
-        this.post.material = new shaderPost(); // custom shader
+        this.post.material = new shaderPostLut(); // custom shader
         this.post.materialVertical = new shaderPostVBlur(); // custom shader
 
         this.post.camera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
@@ -119,22 +119,22 @@ class App {
         this.level.children[0].visible = true;
         this.renderer.render(this.level,this.camera,this.post.renderTarget,true);
 
-        this.post.materialVertical.uniforms.render.value = this.post.renderTarget.texture;
-        this.post.materialVertical.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
-        this.post.materialVertical.uniforms.cameraNear.value = this.camera.near;
-        this.post.materialVertical.uniforms.cameraFar.value = 4000;
-        this.post.materialVertical.uniforms.size.value.set(size.width* 1.,size.height*1.);
+        // this.post.materialVertical.uniforms.render.value = this.post.renderTarget.texture;
+        // this.post.materialVertical.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
+        // this.post.materialVertical.uniforms.cameraNear.value = this.camera.near;
+        // this.post.materialVertical.uniforms.cameraFar.value = 4000;
+        // this.post.materialVertical.uniforms.size.value.set(size.width* 1.,size.height*1.);
+        //
+        // this.post.quad.material = this.post.materialVertical;
 
-        this.post.quad.material = this.post.materialVertical;
+        // this.renderer.render(this.post.scene,this.post.camera,this.post.readTarget,true);
 
-        this.renderer.render(this.post.scene,this.post.camera,this.post.readTarget,true);
-
-        this.post.material.uniforms.render.value = this.post.readTarget.texture;
-        this.post.material.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
+        this.post.material.uniforms.render.value = this.post.renderTarget.texture;
+        // this.post.material.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
         this.post.material.uniforms.lut.value = this.lib.nightgrade.raw;
-        this.post.material.uniforms.cameraNear.value = this.camera.near;
-        this.post.material.uniforms.cameraFar.value = 4000;
-        this.post.material.uniforms.size.value.set(size.width* 1.,size.height*1.);
+        // this.post.material.uniforms.cameraNear.value = this.camera.near;
+        // this.post.material.uniforms.cameraFar.value = 4000;
+        // this.post.material.uniforms.size.value.set(size.width* 1.,size.height*1.);
 
         this.post.quad.material = this.post.material;
 

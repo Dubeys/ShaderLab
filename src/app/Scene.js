@@ -65,13 +65,6 @@ class Scene extends THREE.Scene{
             }
         }
 
-        const boxboxbox = new THREE.Mesh(
-            new THREE.BoxGeometry(3000,3000,3000),
-            new shaderToon()
-        )
-
-        this.addChild(boxboxbox);
-
         const ground = new THREE.Mesh(
             new THREE.PlaneGeometry(4000,4000,20,20),
             new THREE.MeshPhongMaterial({color: 0xCCBB88,side: THREE.DoubleSide,displacementMap: lib.hm_mountain.raw, displacementScale: 400,shading: THREE.FlatShading})
@@ -83,7 +76,7 @@ class Scene extends THREE.Scene{
         // ground.castShadow = true;
         // ground.position.z = -1300;
 
-        const light = new THREE.PointLight(0xFFFFFF,1,1000);
+        const light = new THREE.DirectionalLight(0xFFFFFF,1);
         light.position.set(-10,20,15);
         light.follow = exampleSkybox;
         // light.castShadow = true;

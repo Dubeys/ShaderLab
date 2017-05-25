@@ -62,7 +62,7 @@ var App = function () {
 
         this.post.depthTarget.depthTexture = new THREE.DepthTexture(size.width, size.height, THREE.UnsignedIntType);
 
-        this.post.material = new shaderPost(); // custom shader
+        this.post.material = new shaderPostLut(); // custom shader
         this.post.materialVertical = new shaderPostVBlur(); // custom shader
 
         this.post.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -134,22 +134,22 @@ var App = function () {
             this.level.children[0].visible = true;
             this.renderer.render(this.level, this.camera, this.post.renderTarget, true);
 
-            this.post.materialVertical.uniforms.render.value = this.post.renderTarget.texture;
-            this.post.materialVertical.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
-            this.post.materialVertical.uniforms.cameraNear.value = this.camera.near;
-            this.post.materialVertical.uniforms.cameraFar.value = 4000;
-            this.post.materialVertical.uniforms.size.value.set(size.width * 1., size.height * 1.);
+            // this.post.materialVertical.uniforms.render.value = this.post.renderTarget.texture;
+            // this.post.materialVertical.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
+            // this.post.materialVertical.uniforms.cameraNear.value = this.camera.near;
+            // this.post.materialVertical.uniforms.cameraFar.value = 4000;
+            // this.post.materialVertical.uniforms.size.value.set(size.width* 1.,size.height*1.);
+            //
+            // this.post.quad.material = this.post.materialVertical;
 
-            this.post.quad.material = this.post.materialVertical;
+            // this.renderer.render(this.post.scene,this.post.camera,this.post.readTarget,true);
 
-            this.renderer.render(this.post.scene, this.post.camera, this.post.readTarget, true);
-
-            this.post.material.uniforms.render.value = this.post.readTarget.texture;
-            this.post.material.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
+            this.post.material.uniforms.render.value = this.post.renderTarget.texture;
+            // this.post.material.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
             this.post.material.uniforms.lut.value = this.lib.nightgrade.raw;
-            this.post.material.uniforms.cameraNear.value = this.camera.near;
-            this.post.material.uniforms.cameraFar.value = 4000;
-            this.post.material.uniforms.size.value.set(size.width * 1., size.height * 1.);
+            // this.post.material.uniforms.cameraNear.value = this.camera.near;
+            // this.post.material.uniforms.cameraFar.value = 4000;
+            // this.post.material.uniforms.size.value.set(size.width* 1.,size.height*1.);
 
             this.post.quad.material = this.post.material;
 
@@ -667,10 +667,6 @@ var Scene = function (_THREE$Scene) {
             }
         };
 
-        var boxboxbox = new THREE.Mesh(new THREE.BoxGeometry(3000, 3000, 3000), new shaderToon());
-
-        _this.addChild(boxboxbox);
-
         var ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000, 20, 20), new THREE.MeshPhongMaterial({ color: 0xCCBB88, side: THREE.DoubleSide, displacementMap: lib.hm_mountain.raw, displacementScale: 400, shading: THREE.FlatShading }));
 
         ground.rotation.x = -Math.PI * .5;
@@ -679,7 +675,7 @@ var Scene = function (_THREE$Scene) {
         // ground.castShadow = true;
         // ground.position.z = -1300;
 
-        var light = new THREE.PointLight(0xFFFFFF, 1, 1000);
+        var light = new THREE.DirectionalLight(0xFFFFFF, 1);
         light.position.set(-10, 20, 15);
         light.follow = exampleSkybox;
         // light.castShadow = true;
@@ -910,6 +906,50 @@ var shaderPostVBlur = function (_THREE$ShaderMaterial) {
 
     return shaderPostVBlur;
 }(THREE.ShaderMaterial);
+"use strict";
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var shaderPostLut = function (_THREE$ShaderMaterial) {
+    _inherits(shaderPostLut, _THREE$ShaderMaterial);
+
+    function shaderPostLut() {
+        _classCallCheck(this, shaderPostLut);
+
+        var _this = _possibleConstructorReturn(this, (shaderPostLut.__proto__ || Object.getPrototypeOf(shaderPostLut)).call(this));
+
+        _this.uniforms = {
+            render: { value: null },
+            lut: { value: null }
+        };
+
+        _this.vertexShader = "\n            varying vec2 vUv;\n\n            void main(){\n                vUv = uv;\n                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n            }\n        ";
+
+        _this.fragmentShader = "\n            uniform sampler2D render;\n            uniform sampler2D lut;\n\n            varying vec2 vUv;\n\n            // Ref: http://www.khronos.org/webgl/wiki/WebGL_and_OpenGL_Differences#No_3D_Texture_support\n            vec4 sampleAs3DTexture( sampler2D tex, vec3 texCoord, float size ) {\n              float sliceSize = 1.0 / size;                         // space of 1 slice\n              float slicePixelSize = sliceSize / size;              // space of 1 pixel\n              float sliceInnerSize = slicePixelSize * (size - 1.0); // space of size pixels\n              float zSlice0 = min(floor(texCoord.z * size), size - 1.0);\n              float zSlice1 = min(zSlice0 + 1.0, size - 1.0);\n              float xOffset = slicePixelSize * 0.5 + texCoord.x * sliceInnerSize;\n              float s0 = xOffset + (zSlice0 * sliceSize);\n              float s1 = xOffset + (zSlice1 * sliceSize);\n              vec4 slice0Color = texture2D(tex, vec2(s0, texCoord.y));\n              vec4 slice1Color = texture2D(tex, vec2(s1, texCoord.y));\n              float zOffset = mod(texCoord.z * size, 1.0);\n              return mix(slice0Color, slice1Color, zOffset);\n            }\n\n            void main(){\n                vec4 image = texture2D(render,vUv);\n                image.y = 1. - image.y;\n                vec4 colorCorect = sampleAs3DTexture(lut,image.xyz,16.);\n                gl_FragColor = colorCorect;\n            }\n        ";
+
+        return _this;
+    }
+
+    _createClass(shaderPostLut, [{
+        key: "lut",
+        set: function set(img) {
+            this.uniforms.lut.value = img;
+        }
+    }, {
+        key: "render",
+        set: function set(img) {
+            this.uniforms.render.value = img;
+        }
+    }]);
+
+    return shaderPostLut;
+}(THREE.ShaderMaterial);
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -1122,9 +1162,9 @@ var shaderToon = function (_THREE$ShaderMaterial) {
             _this.uniforms.repeat = { value: colorMap.repeat };
         }
 
-        _this.vertexShader = '\n\n    \t\tvarying vec3 vNormal;\n    \t\t// varying vec3 cNormal;\n            // varying vec3 vPos;\n            varying vec2 vUv;\n            varying vec3 vViewPosition;\n\n            #include <shadowmap_pars_vertex>\n\n    \t\tvoid main() {\n\n                vUv = uv;\n        \t\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n        \t\tvec4 worldPosition = modelMatrix * vec4( position, 1.0 );\n        \t\tvec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );\n                #include <shadowmap_vertex>\n        \t\tvNormal = normalize( normalMatrix * normal );\n                vViewPosition = mvPosition.xyz;\n        \t\t// "vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);\n        \t\t// "cNormal = normalize( projectionMatrix * vec4(normal));\n\n            }\n\n        ';
+        _this.vertexShader = '\n\n    \t\tvarying vec3 vNormal;\n    \t\t// varying vec3 cNormal;\n            // varying vec3 vPos;\n            varying vec2 vUv;\n            varying vec3 vViewPosition;\n\n            #include <shadowmap_pars_vertex>\n\n    \t\tvoid main() {\n\n                vUv = uv;\n        \t\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n        \t\tvec4 worldPosition = modelMatrix * vec4( position, 1.0 );\n        \t\tvec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );\n                #include <shadowmap_vertex>\n        \t\tvNormal = normalize( normalMatrix * normal );\n                vViewPosition = mvPosition.xyz;\n        \t\t// "vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);\n        \t\t// "cNormal = normalize( projectionMatrix * vec4(normal));\n\n            }\n        ';
 
-        _this.fragmentShader = '\n\n    \t\tuniform vec3 uShadowColor;\n            uniform vec3 color;\n            uniform bool colorMapEnabled;\n            uniform sampler2D colorMap;\n            uniform vec2 repeat;\n            uniform float opacity;\n\n            struct DirectionalLight {\n                vec3 direction;\n                vec3 color;\n                int shadow;\n                float shadowBias;\n                float shadowRadius;\n                vec2 shadowMapSize;\n            };\n\n            struct PointLight {\n                vec3 position;\n                vec3 color;\n                float distance;\n                int shadow;\n                float shadowBias;\n                float shadowRadius;\n                vec2 shadowMapSize;\n            };\n\n            struct HemisphereLight {\n                vec3 skyColor;\n                vec3 direction;\n                vec3 groundColor;\n            };\n\n            #if NUM_DIR_LIGHTS > 0\n            uniform DirectionalLight directionalLights[ NUM_DIR_LIGHTS ];\n            #endif\n            #if NUM_POINT_LIGHTS > 0\n            uniform PointLight pointLights[ NUM_POINT_LIGHTS ];\n            #endif\n            #if NUM_HEMI_LIGHTS > 0\n            uniform HemisphereLight hemisphereLights[ NUM_HEMI_LIGHTS ];\n            #endif\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            #include <packing>\n            #include <normalmap_pars_fragment>\n            #include <shadowmap_pars_fragment>\n            #include <shadowmask_pars_fragment>\n\n    \t\tvoid main() {\n\n                #include <normal_flip>\n                #include <normal_fragment>\n                vec3 shadowColor = uShadowColor;\n\n                vec3 outgoingLight = vec3(1.0);\n\n                // float colorInt = length(directionalLights[0].color);\n                float colorInt = 0.;\n\n                // vec3 fColor = color * directionalLights[0].color;\n                vec3 fColor = color;\n\n                if(colorMapEnabled){\n                    fColor = texture2D(colorMap,vUv*repeat).xyz;\n                }\n\n                float shadowMask = getShadowMask();\n\n                float diffuse = 0.0;\n\n                #if NUM_POINT_LIGHTS > 0\n                for(int l = 0; l < NUM_POINT_LIGHTS; l++){\n                    vec3 lDirection = vViewPosition - pointLights[l].position;\n                    vec3 lVector = normalize( lDirection.xyz );\n                    float dotLight = dot( normal,-lVector );\n                    float d = length(lDirection) / pointLights[l].distance;\n                    diffuse += clamp(dotLight,0.,1.) * clamp(1./(d*d),0.,1.);\n                    // fColor *= pointLights[l].color * clamp(1. - length(lDirection) * .0001, .5, 1.);\n                    fColor *= pointLights[l].color;\n                };\n                #endif\n\n                #if NUM_DIR_LIGHTS > 0\n                for(int l = 0; l < NUM_POINT_LIGHTS; l++){\n                    float dotLight = dot( normal,directionalLights[l].direction )\n                    diffuse += clamp(dotLight,0.,1.);\n                    fColor *= directionalLights[l].color\n                };\n                #endif\n\n                #if NUM_HEMI_LIGHTS > 0\n                    for(int i = 0; i < NUM_HEMI_LIGHTS; i++){\n                        float dotNL = dot( normal, hemisphereLights[i].direction );\n                \t\tfloat hemiDiffuseWeight = 0.5 * dotNL + 0.5;\n                \t\tvec3 irradiance = mix( hemisphereLights[i].groundColor, hemisphereLights[i].skyColor, hemiDiffuseWeight );\n                \t\tshadowColor += irradiance;\n                    }\n                #endif\n\n                vec3 finalColor = fColor;\n\n    \t\t\tif ( diffuse > 0.99 ) { finalColor = vec3(1.0) * clamp(length(fColor) * 10., 0.,1.) ; }\n    \t\t\telse if ( diffuse > 0.5 ) { finalColor = fColor; }\n    \t\t\telse if ( diffuse > 0.0 ) { finalColor = clamp(fColor,0.,1.) * (shadowColor + .5); }\n    \t\t\telse { finalColor = clamp(fColor,0.,1.) * shadowColor; }\n    \t\t\tfinalColor = mix(clamp(fColor,0.,1.) * shadowColor,finalColor,shadowMask);\n\n    \t\t\tgl_FragColor = vec4( finalColor,clamp(opacity,0.,1.));\n\n    \t\t}\n        ';
+        _this.fragmentShader = '\n\n    \t\tuniform vec3 uShadowColor;\n            uniform vec3 color;\n            uniform bool colorMapEnabled;\n            uniform sampler2D colorMap;\n            uniform vec2 repeat;\n            uniform float opacity;\n\n            struct DirectionalLight {\n                vec3 direction;\n                vec3 color;\n                int shadow;\n                float shadowBias;\n                float shadowRadius;\n                vec2 shadowMapSize;\n            };\n\n            struct PointLight {\n                vec3 position;\n                vec3 color;\n                float distance;\n                int shadow;\n                float shadowBias;\n                float shadowRadius;\n                vec2 shadowMapSize;\n            };\n\n            struct HemisphereLight {\n                vec3 skyColor;\n                vec3 direction;\n                vec3 groundColor;\n            };\n\n            #if NUM_DIR_LIGHTS > 0\n            uniform DirectionalLight directionalLights[ NUM_DIR_LIGHTS ];\n            #endif\n            #if NUM_POINT_LIGHTS > 0\n            uniform PointLight pointLights[ NUM_POINT_LIGHTS ];\n            #endif\n            #if NUM_HEMI_LIGHTS > 0\n            uniform HemisphereLight hemisphereLights[ NUM_HEMI_LIGHTS ];\n            #endif\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            #include <packing>\n            #include <normalmap_pars_fragment>\n            #include <shadowmap_pars_fragment>\n            #include <shadowmask_pars_fragment>\n\n    \t\tvoid main() {\n\n                #include <normal_flip>\n                #include <normal_fragment>\n                vec3 shadowColor = uShadowColor;\n\n                vec3 outgoingLight = vec3(1.0);\n\n                // float colorInt = length(directionalLights[0].color);\n                float colorInt = 0.;\n\n                // vec3 fColor = color * directionalLights[0].color;\n                vec3 fColor = color;\n\n                if(colorMapEnabled){\n                    fColor = texture2D(colorMap,vUv*repeat).xyz;\n                }\n\n                float shadowMask = getShadowMask();\n\n                float diffuse = 0.0;\n\n                #if NUM_POINT_LIGHTS > 0\n                for(int l = 0; l < NUM_POINT_LIGHTS; l++){\n                    vec3 lDirection = vViewPosition - pointLights[l].position;\n                    vec3 lVector = normalize( lDirection.xyz );\n                    float dotPointLight = dot( normal,-lVector );\n                    float d = length(lDirection) / pointLights[l].distance;\n                    diffuse += clamp(dotPointLight,0.,1.) * clamp(1./(d*d),0.,1.);\n                    // fColor *= pointLights[l].color * clamp(1. - length(lDirection) * .0001, .5, 1.);\n                    fColor *= pointLights[l].color;\n                };\n                #endif\n\n                #if NUM_DIR_LIGHTS > 0\n                for(int l = 0; l < NUM_DIR_LIGHTS; l++){\n                    float dotDirLight = dot( normal,directionalLights[l].direction );\n                    diffuse += clamp(dotDirLight,0.,1.);\n                    fColor *= directionalLights[l].color;\n                };\n                #endif\n\n                #if NUM_HEMI_LIGHTS > 0\n                    for(int i = 0; i < NUM_HEMI_LIGHTS; i++){\n                        float dotNL = dot( normal, hemisphereLights[i].direction );\n                \t\tfloat hemiDiffuseWeight = 0.5 * dotNL + 0.5;\n                \t\tvec3 irradiance = mix( hemisphereLights[i].groundColor, hemisphereLights[i].skyColor, hemiDiffuseWeight );\n                \t\tshadowColor += irradiance;\n                    }\n                #endif\n\n                vec3 finalColor = fColor;\n\n    \t\t\tif ( diffuse > 0.99 ) { finalColor = vec3(1.0) * clamp(length(fColor) * 10., 0.,1.) ; }\n    \t\t\telse if ( diffuse > 0.5 ) { finalColor = fColor; }\n    \t\t\telse if ( diffuse > 0.0 ) { finalColor = clamp(fColor,0.,1.) * (shadowColor + .5); }\n    \t\t\telse { finalColor = clamp(fColor,0.,1.) * shadowColor; }\n    \t\t\tfinalColor = mix(clamp(fColor,0.,1.) * shadowColor,finalColor,shadowMask);\n\n    \t\t\tgl_FragColor = vec4( finalColor,clamp(opacity,0.,1.));\n\n    \t\t}\n        ';
 
         if (normalMap) {
             _this.fragmentShader = "#define USE_NORMALMAP \n" + _this.fragmentShader;

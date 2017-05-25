@@ -55,7 +55,6 @@ class shaderToon extends THREE.ShaderMaterial{
         		// "cNormal = normalize( projectionMatrix * vec4(normal));
 
             }
-
         `
 
     	this.fragmentShader = `
@@ -137,19 +136,19 @@ class shaderToon extends THREE.ShaderMaterial{
                 for(int l = 0; l < NUM_POINT_LIGHTS; l++){
                     vec3 lDirection = vViewPosition - pointLights[l].position;
                     vec3 lVector = normalize( lDirection.xyz );
-                    float dotLight = dot( normal,-lVector );
+                    float dotPointLight = dot( normal,-lVector );
                     float d = length(lDirection) / pointLights[l].distance;
-                    diffuse += clamp(dotLight,0.,1.) * clamp(1./(d*d),0.,1.);
+                    diffuse += clamp(dotPointLight,0.,1.) * clamp(1./(d*d),0.,1.);
                     // fColor *= pointLights[l].color * clamp(1. - length(lDirection) * .0001, .5, 1.);
                     fColor *= pointLights[l].color;
                 };
                 #endif
 
                 #if NUM_DIR_LIGHTS > 0
-                for(int l = 0; l < NUM_POINT_LIGHTS; l++){
-                    float dotLight = dot( normal,directionalLights[l].direction )
-                    diffuse += clamp(dotLight,0.,1.);
-                    fColor *= directionalLights[l].color
+                for(int l = 0; l < NUM_DIR_LIGHTS; l++){
+                    float dotDirLight = dot( normal,directionalLights[l].direction );
+                    diffuse += clamp(dotDirLight,0.,1.);
+                    fColor *= directionalLights[l].color;
                 };
                 #endif
 
