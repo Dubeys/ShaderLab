@@ -14,18 +14,21 @@
     {
         "type" : "texture",
         "url" : "assets/textures/lut32_nightgrade.png",
-        "name" : "nightgrade"
+        "name" : "nightgrade",
+        "filter": "nearest"
     },
 
     {
         "type" : "texture",
         "url" : "assets/textures/lut32_neutral.png",
-        "name" : "neutralgrade"
+        "name" : "neutralgrade",
+        "filter": "nearest"
     },
 
     {
         "type" : "texture",
         "url" : "assets/textures/lut32_sat.png",
-        "name" : "satgrade"
+        "name" : "satgrade",
+        "filter": "nearest"
     }
 ]

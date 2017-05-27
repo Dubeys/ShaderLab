@@ -1,10 +1,10 @@
 class shaderPostLut extends THREE.ShaderMaterial{
-    constructor(){
+    constructor({lut}){
         super();
 
         this.uniforms = {
             render: {value: null},
-            lut: {value: null}
+            lut: {value: lut || null}
         }
 
         this.vertexShader =

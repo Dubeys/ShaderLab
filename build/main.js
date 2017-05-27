@@ -21,6 +21,7 @@ var App = function () {
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, precision: precision });
         this.renderer.setSize(width, height);
+        // this.renderer.setPixelRatio(2);
         this.renderer.domElement.style.position = 'absolute';
         this.renderer.autoClear = false;
         // this.renderer.setClearColor(0xCCCCFF);
@@ -41,37 +42,7 @@ var App = function () {
 
         var size = this.renderer.getSize();
 
-        this.post.renderTarget = new THREE.WebGLRenderTarget(size.width * 2, size.height * 2, {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-            stencilBuffer: false
-        });
-        this.post.readTarget = new THREE.WebGLRenderTarget(size.width * 2, size.height * 2, {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-            stencilBuffer: false
-        });
-        this.post.depthTarget = new THREE.WebGLRenderTarget(size.width, size.height, {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-            stencilBuffer: false
-        });
-
-        this.post.depthTarget.depthTexture = new THREE.DepthTexture(size.width, size.height, THREE.UnsignedIntType);
-
-        this.post.material = new shaderPostLut(); // custom shader
-        this.post.materialVertical = new shaderPostVBlur(); // custom shader
-
-        this.post.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-        this.post.scene = new THREE.Scene();
-
-        this.post.quad = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), null);
-        this.post.quad.frustumCulled = false; // Avoid getting clipped
-
-        this.post.scene.add(this.post.quad);
+        this.post = new PostProcess(size.width * 2, size.height * 2, false);
     }
 
     _createClass(App, [{
@@ -82,11 +53,12 @@ var App = function () {
             this.inputs = new Inputs();
             this.inputs.onResize(App.setSize.bind(this));
             this.lib = lib;
-            this.lib.nightgrade.raw.minFilter = THREE.NearestFilter;
 
             this.level = new Scene(this.camera, lib, this.inputs);
 
             console.log(this.renderer.info);
+
+            this.post.addShader(new shaderPostLut({ lut: this.lib.neutralgrade.raw }), true);
 
             this.render();
             this.level.afterInitRender();
@@ -106,7 +78,7 @@ var App = function () {
         key: 'render',
         value: function render() {
             this.renderer.clear();
-            this.postProcess();
+            this.post.render(this.renderer, this.level, this.camera);
         }
     }, {
         key: 'cameraControlsUpdate',
@@ -119,41 +91,6 @@ var App = function () {
 
             var vector = new THREE.Vector3(Math.cos(this.cameraTarget.y) * Math.sin(this.cameraTarget.x), Math.cos(this.cameraTarget.x), Math.sin(this.cameraTarget.y) * Math.sin(this.cameraTarget.x)).multiplyScalar(2000);
             this.camera.lookAt(vector);
-        }
-    }, {
-        key: 'postProcess',
-        value: function postProcess(opts) {
-
-            var size = this.renderer.getSize();
-
-            this.post.renderTarget.setSize(size.width * 2, size.height * 2);
-            this.post.depthTarget.setSize(size.width, size.height);
-            this.post.readTarget.setSize(size.width, size.height);
-            this.level.children[0].visible = false;
-            this.renderer.render(this.level, this.camera, this.post.depthTarget, true);
-            this.level.children[0].visible = true;
-            this.renderer.render(this.level, this.camera, this.post.renderTarget, true);
-
-            // this.post.materialVertical.uniforms.render.value = this.post.renderTarget.texture;
-            // this.post.materialVertical.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
-            // this.post.materialVertical.uniforms.cameraNear.value = this.camera.near;
-            // this.post.materialVertical.uniforms.cameraFar.value = 4000;
-            // this.post.materialVertical.uniforms.size.value.set(size.width* 1.,size.height*1.);
-            //
-            // this.post.quad.material = this.post.materialVertical;
-
-            // this.renderer.render(this.post.scene,this.post.camera,this.post.readTarget,true);
-
-            this.post.material.uniforms.render.value = this.post.renderTarget.texture;
-            // this.post.material.uniforms.renderDepth.value = this.post.depthTarget.depthTexture;
-            this.post.material.uniforms.lut.value = this.lib.nightgrade.raw;
-            // this.post.material.uniforms.cameraNear.value = this.camera.near;
-            // this.post.material.uniforms.cameraFar.value = 4000;
-            // this.post.material.uniforms.size.value.set(size.width* 1.,size.height*1.);
-
-            this.post.quad.material = this.post.material;
-
-            this.renderer.render(this.post.scene, this.post.camera);
         }
     }], [{
         key: 'setSize',
@@ -303,6 +240,15 @@ var Cache = function () {
             var loader = new THREE.TextureLoader();
             loader.load(info.url, function (texture) {
                 info.raw = texture;
+                if (info.filter) {
+                    switch (info.filter) {
+                        case "nearest":
+                            info.raw.minFilter = THREE.NearestFilter;
+                            info.raw.maxFilter = THREE.NearestFilter;
+                            break;
+                    }
+                }
+
                 this.lib[info.name] = info;
                 Cache.progress.call(this, info.name, 100);
                 Cache.loaded.call(this);
@@ -583,6 +529,137 @@ var Inputs = function () {
     }]);
 
     return Inputs;
+}();
+"use strict";
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var PostProcess = function () {
+    function PostProcess(width, height, depth) {
+        _classCallCheck(this, PostProcess);
+
+        this.renderTarget = new THREE.WebGLRenderTarget(width, height, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            stencilBuffer: false
+        });
+
+        this.readTarget = new THREE.WebGLRenderTarget(width, height, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            stencilBuffer: false
+        });
+
+        this.depthTarget = new THREE.WebGLRenderTarget(width, height, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            stencilBuffer: false
+        });
+
+        this.depthTarget.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
+
+        this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        this.scene = new THREE.Scene();
+
+        this.quad = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), null);
+        this.quad.frustumCulled = false; // Avoid getting clipped
+
+        this.scene.add(this.quad);
+
+        this.effect = [];
+
+        this.depthRender = depth;
+        this.hiddenOnDepthWrite = [];
+    }
+
+    _createClass(PostProcess, [{
+        key: "hideOnDepthRender",
+        value: function hideOnDepthRender(object) {
+            this.hiddenOnDepthWrite.push(object);
+        }
+    }, {
+        key: "addShader",
+        value: function addShader(shader, toScreen, before, after, uniformsToUpdate) {
+            this.effect.push({ shader: shader, toScreen: toScreen, before: before, after: after, uniformsToUpdate: uniformsToUpdate });
+        }
+    }, {
+        key: "render",
+        value: function render(renderer, scene, camera) {
+            var size = renderer.getSize();
+
+            //depth render if needed
+            if (this.depthRender) {
+
+                for (var i in this.hiddenOnDepthWrite) {
+                    this.hiddenOnDepthWrite[i].visible = false;
+                }
+                renderer.render(scene, camera, this.depthTarget, true);
+
+                for (var _i in this.hiddenOnDepthWrite) {
+                    this.hiddenOnDepthWrite[_i].visible = true;
+                }
+            }
+
+            // scene initial render
+            renderer.render(scene, camera, this.renderTarget, true);
+
+            //loop trough all added effects
+            for (var _i2 = 0; _i2 < this.effect.length; _i2++) {
+
+                //before effect render callback
+                if (this.effect[_i2].before) {
+                    this.effect[_i2].before();
+                }
+
+                //set render texture
+                this.effect[_i2].shader.uniforms.render.value = this.renderTarget.texture;
+
+                //set depth texture if needed
+                if (this.effect[_i2].shader.uniforms.renderDepth) {
+                    this.effect[_i2].shader.uniforms.renderDepth.value = this.depthTarget.depthTexture;
+                }
+
+                // set size uniform if needed
+                if (this.effect[_i2].shader.uniforms.size) {
+                    this.effect[_i2].shader.uniforms.size.value = new THREE.Vector2(size.width, size.height);
+                }
+
+                // update special uniforms if needed
+                if (this.effect[_i2].uniformsToUpdate) {
+                    for (var _i3 in uniformsToUpdate) {
+                        this.effect[_i3].shader.uniforms[_i3].value = uniformsToUpdate[_i3];
+                    }
+                }
+
+                //apply shader to render quad;
+                this.quad.material = this.effect[_i2].shader;
+
+                //render to screen
+                if (!this.effect[_i2].toScreen) {
+                    renderer.render(this.scene, this.camera, this.readTarget, true);
+
+                    // after effect render callback
+                    if (this.effect[_i2].after) {
+                        this.effect[_i2].after();
+                    }
+
+                    //swap
+                    var tempTarget = this.renderTarget.clone();
+                    this.renderTarget.copy(this.readTarget);
+                    this.readTarget.copy(tempTarget);
+                } else {
+                    renderer.render(this.scene, this.camera);
+                }
+            }
+        }
+    }]);
+
+    return PostProcess;
 }();
 'use strict';
 
@@ -919,14 +996,16 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 var shaderPostLut = function (_THREE$ShaderMaterial) {
     _inherits(shaderPostLut, _THREE$ShaderMaterial);
 
-    function shaderPostLut() {
+    function shaderPostLut(_ref) {
+        var lut = _ref.lut;
+
         _classCallCheck(this, shaderPostLut);
 
         var _this = _possibleConstructorReturn(this, (shaderPostLut.__proto__ || Object.getPrototypeOf(shaderPostLut)).call(this));
 
         _this.uniforms = {
             render: { value: null },
-            lut: { value: null }
+            lut: { value: lut || null }
         };
 
         _this.vertexShader = "\n            varying vec2 vUv;\n\n            void main(){\n                vUv = uv;\n                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n            }\n        ";
@@ -1013,7 +1092,7 @@ var shaderSky = function (_THREE$ShaderMaterial) {
 
         _this.vertexShader = 'uniform float time;\n\n    \t\tvarying vec3 vNormal;\n            varying vec2 vUv;\n            varying vec3 vViewPosition;\n\n    \t\tvoid main() {\n\n                vUv = uv;\n        \t\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n        \t\tvec4 worldPosition = modelMatrix * vec4( position, 1.0 );\n        \t\tvNormal = normalize( normalMatrix * normal );\n                vViewPosition = position;\n        \t\t// vPos = vec3((modelViewMatrix * vec4( position, 1.0 )).xyz);\n                // cNormal = normalize( projectionMatrix * vec4(normal));\n\n            }';
 
-        _this.fragmentShader = 'uniform float time;\n            uniform vec3 uColor;\n            uniform vec3 uAtmColor;\n            uniform vec3 uHorColor;\n            uniform vec3 uHorHardColor;\n            uniform vec3 uSunPos;\n            uniform float sunInt;\n            uniform vec3 cameraLookAt;\n            uniform sampler2D clouds;\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {\n            \tfloat d = length(pos - uv) - rad;\n            \tfloat t = clamp(d, 0.0, 1.0);\n            \treturn vec4(color, 1.0 - t);\n            }\n\n            vec3 mod289(vec3 x) {\n              return x - floor(x * (1.0 / 239.0)) * 239.0;\n            }\n\n            vec2 mod289(vec2 x) {\n              return x - floor(x * (1.0 / 289.0)) * 289.0;\n            }\n\n            vec3 permute(vec3 x) {\n              return mod289(((x*34.0)+1.0)*x);\n            }\n\n            float snoise(vec2 v) {\n\n              const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0\n                                  0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)\n                                 -0.577350269189626,  // -1.0 + 2.0 * C.x\n                                  0.024390243902439); // 1.0 / 41.0\n            // First corner\n              vec2 i  = floor(v + dot(v, C.yy) );\n              vec2 x0 = v -   i + dot(i, C.xx);\n\n              vec2 i1;\n              i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);\n              vec4 x12 = x0.xyxy + C.xxzz;\n              x12.xy -= i1;\n\n              i = mod289(i); // Avoid truncation effects in permutation\n              vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))\n            \t\t+ i.x + vec3(0.0, i1.x, 1.0 ));\n\n              vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);\n              m = m*m ;\n              m = m*m ;\n              vec3 x = 2.0 * fract(p * C.www) - 1.0;\n              vec3 h = abs(x) - 0.5;\n              vec3 ox = floor(x + 0.5);\n              vec3 a0 = x - ox;\n              m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );\n              vec3 g;\n              g.x  = a0.x  * x0.x  + h.x  * x0.y;\n              g.yz = a0.yz * x12.xz + h.yz * x12.yw;\n              return 150.0 * dot(m, g);\n            }\n\n            float star(vec2 p) {\n              return step(1.0, smoothstep(0.5, 1.1, snoise(p)));\n            }\n\n    \t\tvoid main() {\n                vec3 nPos = normalize( vViewPosition);\n                vec3 fPos = nPos;\n                nPos = 0.5 + (nPos * 0.5);\n                vec3 gradient = vec3(0.0);\n                vec4 gradient2 = vec4(0.0);\n                vec3 colorAddition = vec3(0.0);\n                vec3 sunPos = normalize(uSunPos);\n\n                float nightdayIntensity = 0.2 + clamp(sunPos.y*.8,0.,1.);\n\n                if(nPos.y > 0.49){\n                    gradient = clamp(mix(uHorColor,uAtmColor,-2.0*0.5+nPos.y*2.0),0.0,1.0);\n                }else{\n                    gradient = clamp(mix(uHorColor,uAtmColor,2.0*0.5-nPos.y*2.0),0.0,0.1);\n                }\n\n                if(nPos.y > 0.49){\n                    gradient2 = clamp(mix(vec4(gradient,0.0),vec4(uHorHardColor,1.0),10.0*0.6-nPos.y*10.0),0.0,1.0);\n                }\n\n                float s1 = star(vUv * 300.);\n                float s2 = star(vUv * 500.5 + vec2(-20.0, 10.0));\n                float s3 = star(vUv * 700.14 + vec2(-75.0, 25.0));\n                vec3 starsLayer = vec3(s1 * 1. + s2 * .6 + s3 * .3 );\n\n                gradient += starsLayer * clamp(1. - sunPos.y * 2.0, 0.0,1.0);\n\n                float dist = distance(sunPos,fPos);\n\n                vec4 sun = vec4(0.0);\n                vec4 sunColor = vec4(0.0);\n                if(dist*30.0 < 1.0){\n                    sun = vec4(1.0);\n                    sunColor = vec4(uColor,1.);\n                }\n\n                float distanceToCamera = (1.0 - clamp(distance(normalize(cameraLookAt),sunPos)*1.2,0.0,1.0)) * .3;\n\n                float dist2 = distance(vec3(sunPos.x,0.0,sunPos.z),vec3(fPos.x*0.5+sunPos.x*0.5,fPos.y*10.0,fPos.z));\n                dist = 0.5 * (1.0 + distanceToCamera) / exp(log(dist)/7.0);\n                dist2 = 0.2 / exp(log(dist2)/4.0);\n                dist += dist2;\n                dist = clamp(dist,0.0,1.0);\n\n                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a * (1. - sunPos.y));\n\n                vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);\n\n                vec4 mix2 = mix(mix1,rGradient,rGradient.a*2.5 - 1.5);\n\n                if(sun.r > 0.){\n                    mix2 = mix(sun,sunColor,sunInt);\n                }\n\n    \t\t\t// gl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);\n                vec2 nUv = fPos.xz * (1.2 - fPos.y );\n                nUv = .5 + nUv * .5;\n                vec4 cloudsColor = mix(vec4(uHorHardColor.rgb,0.),vec4(uHorHardColor.rgb,1.),texture2D(clouds,nUv + vec2(time/100.,time/100.)).r);\n                gl_FragColor = mix(vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0) , cloudsColor, cloudsColor.a );\n\n    \t\t}';
+        _this.fragmentShader = 'uniform float time;\n            uniform vec3 uColor;\n            uniform vec3 uAtmColor;\n            uniform vec3 uHorColor;\n            uniform vec3 uHorHardColor;\n            uniform vec3 uSunPos;\n            uniform float sunInt;\n            uniform vec3 cameraLookAt;\n            uniform sampler2D clouds;\n\n    \t\tvarying vec3 vNormal;\n    \t\tvarying vec3 vViewPosition;\n    \t\tvarying vec2 vUv;\n\n            vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {\n            \tfloat d = length(pos - uv) - rad;\n            \tfloat t = clamp(d, 0.0, 1.0);\n            \treturn vec4(color, 1.0 - t);\n            }\n\n            vec3 mod289(vec3 x) {\n              return x - floor(x * (1.0 / 239.0)) * 239.0;\n            }\n\n            vec2 mod289(vec2 x) {\n              return x - floor(x * (1.0 / 289.0)) * 289.0;\n            }\n\n            vec3 permute(vec3 x) {\n              return mod289(((x*34.0)+1.0)*x);\n            }\n\n            float snoise(vec2 v) {\n\n              const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0\n                                  0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)\n                                 -0.577350269189626,  // -1.0 + 2.0 * C.x\n                                  0.024390243902439); // 1.0 / 41.0\n            // First corner\n              vec2 i  = floor(v + dot(v, C.yy) );\n              vec2 x0 = v -   i + dot(i, C.xx);\n\n              vec2 i1;\n              i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);\n              vec4 x12 = x0.xyxy + C.xxzz;\n              x12.xy -= i1;\n\n              i = mod289(i); // Avoid truncation effects in permutation\n              vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))\n            \t\t+ i.x + vec3(0.0, i1.x, 1.0 ));\n\n              vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);\n              m = m*m ;\n              m = m*m ;\n              vec3 x = 2.0 * fract(p * C.www) - 1.0;\n              vec3 h = abs(x) - 0.5;\n              vec3 ox = floor(x + 0.5);\n              vec3 a0 = x - ox;\n              m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );\n              vec3 g;\n              g.x  = a0.x  * x0.x  + h.x  * x0.y;\n              g.yz = a0.yz * x12.xz + h.yz * x12.yw;\n              return 150.0 * dot(m, g);\n            }\n\n            float star(vec2 p) {\n              return step(1.0, smoothstep(0.5, 1.1, snoise(p)));\n            }\n\n            float cloudDensity(sampler2D img, vec2 uv){\n                vec2 off1 = vec2(0.001) * vec2(1.,0.);\n                vec2 off2 = vec2(0.001) * vec2(0.,1.);\n                vec2 off3 = vec2(0.001) * normalize(vec2(5.,5.));\n                vec2 off4 = vec2(0.001) * normalize(vec2(5.,-5.));\n\n                float dens = texture2D(img, uv).r * 0.29411764705882354 * .25;\n                dens += texture2D(img, uv + off1).r * 0.35294117647058826 * .25;\n                dens += texture2D(img, uv - off1).r * 0.35294117647058826 * .25;\n\n                dens += texture2D(img, uv).r * 0.29411764705882354 * .25;\n                dens += texture2D(img, uv + off2).r * 0.35294117647058826 * .25;\n                dens += texture2D(img, uv - off2).r * 0.35294117647058826 * .25;\n\n                dens += texture2D(img, uv).r * 0.29411764705882354 * .25;\n                dens += texture2D(img, uv + off3).r * 0.35294117647058826 * .25;\n                dens += texture2D(img, uv - off3).r * 0.35294117647058826 * .25;\n\n                dens += texture2D(img, uv).r * 0.29411764705882354 * .25;\n                dens += texture2D(img, uv + off4).r * 0.35294117647058826 * .25;\n                dens += texture2D(img, uv - off4).r * 0.35294117647058826 * .25;\n\n                return dens;\n            }\n\n    \t\tvoid main() {\n                vec3 nPos = normalize( vViewPosition);\n                vec3 fPos = nPos;\n                nPos = 0.5 + (nPos * 0.5);\n                vec3 gradient = vec3(0.0);\n                vec4 gradient2 = vec4(0.0);\n                vec3 colorAddition = vec3(0.0);\n                vec3 sunPos = normalize(uSunPos);\n\n                float nightdayIntensity = 0.2 + clamp(sunPos.y*.8,0.,1.);\n\n                if(nPos.y > 0.49){\n                    gradient = clamp(mix(uHorColor,uAtmColor,-2.0*0.5+nPos.y*2.0),0.0,1.0);\n                }else{\n                    gradient = clamp(mix(uHorColor,uAtmColor,2.0*0.5-nPos.y*2.0),0.0,0.1);\n                }\n\n                if(nPos.y > 0.49){\n                    gradient2 = clamp(mix(vec4(gradient,0.0),vec4(uHorHardColor,1.0),10.0*0.6-nPos.y*10.0),0.0,1.0);\n                }\n\n                float s1 = star(vUv * 300.);\n                float s2 = star(vUv * 500.5 + vec2(-20.0, 10.0));\n                float s3 = star(vUv * 700.14 + vec2(-75.0, 25.0));\n                vec3 starsLayer = vec3(s1 * 1. + s2 * .6 + s3 * .3 );\n\n                gradient += starsLayer * clamp(1. - sunPos.y * 2.0, 0.0,1.0);\n\n                float dist = distance(sunPos,fPos);\n\n                vec4 sun = vec4(0.0);\n                vec4 sunColor = vec4(0.0);\n                if(dist*30.0 < 1.0){\n                    sun = vec4(1.0);\n                    sunColor = vec4(uColor,1.);\n                }\n\n                float distanceToCamera = (1.0 - clamp(distance(normalize(cameraLookAt),sunPos)*1.2,0.0,1.0)) * .3;\n\n                float dist2 = distance(vec3(sunPos.x,0.0,sunPos.z),vec3(fPos.x*0.5+sunPos.x*0.5,fPos.y*10.0,fPos.z));\n                dist = 0.5 * (1.0 + distanceToCamera) / exp(log(dist)/7.0);\n                dist2 = 0.2 / exp(log(dist2)/4.0);\n                dist += dist2;\n                dist = clamp(dist,0.0,1.0);\n\n                vec4 mix1 = mix(vec4(gradient,1.0),gradient2,gradient2.a * (1. - sunPos.y));\n\n                vec4 rGradient = clamp(mix(vec4(mix1.rgb,0.0),vec4(uColor,1.0),dist),0.0,1.0);\n\n                vec4 mix2 = mix(mix1,rGradient,rGradient.a*2.5 - 1.5);\n\n                if(sun.r > 0.){\n                    mix2 = mix(sun,sunColor,sunInt);\n                }\n\n    \t\t\t// gl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);\n                vec2 nUv = fPos.xz * (1.2 - fPos.y );\n                nUv = .5 + nUv * .5;\n\n                float cloud = max(texture2D(clouds,nUv + vec2(time/100.,time/100.)).r - .2,0.);\n                float density = cloudDensity(clouds,nUv + vec2(time/100.,time/100.));\n                density = clamp(density*2.,0.,1.);\n                vec3 cloudsColorMix = mix(uColor,vec3(.8) * uAtmColor,density);\n                vec4 cloudsColor = vec4(cloudsColorMix,cloud);\n                // vec4 cloudsColor = vec4(cloud);\n                gl_FragColor = mix(vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0) , cloudsColor, cloudsColor.a );\n\n    \t\t}';
         return _this;
     }
 

@@ -127,6 +127,15 @@ class Cache {
             info.url,
             function(texture){
                 info.raw = texture;
+                if(info.filter){
+                    switch (info.filter) {
+                        case "nearest":
+                            info.raw.minFilter = THREE.NearestFilter;
+                            info.raw.maxFilter = THREE.NearestFilter;
+                        break;
+                    }
+                }
+
                 this.lib[info.name] = info;
                 Cache.progress.call(this,info.name,100);
                 Cache.loaded.call(this);

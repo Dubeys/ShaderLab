@@ -119,6 +119,31 @@ class shaderSky extends THREE.ShaderMaterial{
               return step(1.0, smoothstep(0.5, 1.1, snoise(p)));
             }
 
+            float cloudDensity(sampler2D img, vec2 uv){
+                vec2 off1 = vec2(0.001) * vec2(1.,0.);
+                vec2 off2 = vec2(0.001) * vec2(0.,1.);
+                vec2 off3 = vec2(0.001) * normalize(vec2(5.,5.));
+                vec2 off4 = vec2(0.001) * normalize(vec2(5.,-5.));
+
+                float dens = texture2D(img, uv).r * 0.29411764705882354 * .25;
+                dens += texture2D(img, uv + off1).r * 0.35294117647058826 * .25;
+                dens += texture2D(img, uv - off1).r * 0.35294117647058826 * .25;
+
+                dens += texture2D(img, uv).r * 0.29411764705882354 * .25;
+                dens += texture2D(img, uv + off2).r * 0.35294117647058826 * .25;
+                dens += texture2D(img, uv - off2).r * 0.35294117647058826 * .25;
+
+                dens += texture2D(img, uv).r * 0.29411764705882354 * .25;
+                dens += texture2D(img, uv + off3).r * 0.35294117647058826 * .25;
+                dens += texture2D(img, uv - off3).r * 0.35294117647058826 * .25;
+
+                dens += texture2D(img, uv).r * 0.29411764705882354 * .25;
+                dens += texture2D(img, uv + off4).r * 0.35294117647058826 * .25;
+                dens += texture2D(img, uv - off4).r * 0.35294117647058826 * .25;
+
+                return dens;
+            }
+
     		void main() {
                 vec3 nPos = normalize( vViewPosition);
                 vec3 fPos = nPos;
@@ -177,7 +202,13 @@ class shaderSky extends THREE.ShaderMaterial{
     			// gl_FragColor = vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0);
                 vec2 nUv = fPos.xz * (1.2 - fPos.y );
                 nUv = .5 + nUv * .5;
-                vec4 cloudsColor = mix(vec4(uHorHardColor.rgb,0.),vec4(uHorHardColor.rgb,1.),texture2D(clouds,nUv + vec2(time/100.,time/100.)).r);
+
+                float cloud = max(texture2D(clouds,nUv + vec2(time/100.,time/100.)).r - .2,0.);
+                float density = cloudDensity(clouds,nUv + vec2(time/100.,time/100.));
+                density = clamp(density*2.,0.,1.);
+                vec3 cloudsColorMix = mix(uColor,vec3(.8) * uAtmColor,density);
+                vec4 cloudsColor = vec4(cloudsColorMix,cloud);
+                // vec4 cloudsColor = vec4(cloud);
                 gl_FragColor = mix(vec4( mix2.rgb * (1.0 + distanceToCamera*4.0 * nightdayIntensity),1.0) , cloudsColor, cloudsColor.a );
 
     		}`
